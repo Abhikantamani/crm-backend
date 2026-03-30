@@ -59,7 +59,7 @@ async def chat_endpoint(user_input: Message):
         elif state["step"] == 3:
             state["data"]["requirement"] = user_input.message
             
-            db_url = "https://httpbin.org/post"
+            db_url = "http://13.202.92.112:5000/api/leads"
             lead_payload = {
                 "name": state["data"]["name"],
                 "email": state["data"]["email"],
@@ -89,7 +89,7 @@ async def chat_endpoint(user_input: Message):
         elif state["step"] == 2:
             state["data"]["issue"] = user_input.message
             
-            db_url = "https://httpbin.org/post"
+            db_url = "http://13.202.92.112:5000/api/tickets"
             ticket_payload = {
                 "email": state["data"]["email"],
                 "subject": "Chatbot Support Request",
