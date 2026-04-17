@@ -8,7 +8,7 @@ const AdminDashboard = () => {
     setIsLoading(true);
     try {
       // 🚨 REPLACE THIS URL WITH YOUR LOCALTUNNEL PORT 8000 URL
-      const response = await fetch('http://127.0.0.1:8000/api/admin', {
+      const response = await fetch('https://crm-backend-z5d9.onrender.com/api/admin', {
         headers: {
             'Bypass-Tunnel-Reminder': 'true' // Bypasses Localtunnel security screen
         },

@@ -46,7 +46,7 @@ const CrmChatbot = () => {
 
     try {
       // 🚨 REPLACE THIS URL WITH YOUR LOCALTUNNEL PORT 8000 URL
-      const response = await fetch('http://127.0.0.1:8000/chat', {
+      const response = await fetch('https://crm-backend-z5d9.onrender.com/chat', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
