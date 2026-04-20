@@ -1,50 +1,52 @@
-import streamlit as st
-import requests
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+# import your AI libraries here (e.g., openai, google.generativeai, etc.)
 
-st.set_page_config(page_title="Enterprise CRM Bot", layout="wide")
+app = FastAPI()
 
-# 1. Sidebar - This makes it look like a "Complete CRM Setup"
-st.sidebar.title("📊 CRM Dashboard")
-try:
-    stats = requests.get("http://127.0.0.1:8000/crm/summary").json()
-    st.sidebar.metric("Active Leads", stats["active_leads"])
-    st.sidebar.metric("Open Tickets", stats["open_tickets"])
-    st.sidebar.metric("Pipeline Value", stats["revenue_pipeline"])
-except:
-    st.sidebar.error("Backend Offline")
+# 🚨 REQUIRED FOR VERCEL TO TALK TO RENDER
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, you can replace "*" with your Vercel URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-st.sidebar.markdown("---")
-st.sidebar.write("**Current User:** Abhiram (Admin)")
+class UserMessage(BaseModel):
+    text: str
 
-# 2. Main Chat Interface
-st.title("🤖 CRM AI Assistant")
-st.caption("Connected to Project API v2.0 (Mock Mode Active)")
+# 1. Your System Prompt / Data Dump
+SYSTEM_PROMPT = """
+You are a highly professional sales assistant for our CRM platform. 
+Answer user questions concisely and accurately.
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+Here is our company pricing data:
+- Setup Fee: $100 one-time fee
+- Basic Monthly: $15/month
+- Pro API Access: $49/month
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+CRITICAL RULE: If the user asks about pricing, cost, plans, or fees, you must give a brief 1-sentence summary of our flexibility, and you MUST include the exact text [SHOW_PRICING] at the very end of your response.
+"""
 
-if prompt := st.chat_input("Ask about leads, tickets, or log an issue..."):
-    # Add user message to UI
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+@app.post("/chat")
+async def chat_endpoint(message: UserMessage):
+    user_text = message.text
+    
+    # ---------------------------------------------------------
+    # 2. YOUR AI LOGIC GOES HERE
+    # Connect to your LLM (LLAMA, OpenAI, Gemini, etc.) and pass 
+    # both the SYSTEM_PROMPT and the user_text.
+    #
+    # Example placeholder logic if you don't have the AI hooked up yet:
+    # ---------------------------------------------------------
+    
+    user_text_lower = user_text.lower()
+    if "price" in user_text_lower or "cost" in user_text_lower or "plan" in user_text_lower:
+        ai_response = "We have a few flexible plans to fit your needs! [SHOW_PRICING]"
+    else:
+        ai_response = f"You said: {user_text}. I am a CRM bot, how can I help you today?"
 
-    # API Call to your FastAPI backend
-    try:
-        response = requests.post(
-            "http://127.0.0.1:8000/chat",
-            json={"message": prompt},
-            headers={"Authorization": "Bearer DEMO_TOKEN_123"}
-        )
-        full_response = response.json()["response"]
-    except:
-        full_response = "Error: Backend is not responding. Ensure uvicorn is running on Port 8000."
-
-    # Add bot response to UI
-    with st.chat_message("assistant"):
-        st.markdown(full_response)
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Return the response to the React frontend
+    return {"reply": ai_response}

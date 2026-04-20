@@ -1,129 +1,130 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 
-const CrmChatbot = () => {
-  const defaultWelcomeMessage = { role: 'assistant', content: 'Hi there! Welcome to our website. Are you looking for Sales (Pricing/Features) or do you need Customer Support?' };
-  
-  const [messages, setMessages] = useState([defaultWelcomeMessage]);
+// --- 1. The Minimalist Pricing Component ---
+const MenuPricing = () => (
+  <div className="flex flex-col gap-2 w-full max-w-sm mt-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Pricing List</h3>
+    
+    <div className="flex justify-between items-center py-2 border-b border-gray-50">
+      <span className="text-sm text-gray-700">Initial Setup</span>
+      <span className="text-sm font-medium text-gray-900">$100</span>
+    </div>
+    
+    <div className="flex justify-between items-center py-2 border-b border-gray-50">
+      <span className="text-sm text-gray-700">Basic Monthly</span>
+      <span className="text-sm font-medium text-gray-900">$15 / mo</span>
+    </div>
+    
+    <div className="flex justify-between items-center py-2">
+      <span className="text-sm text-gray-700">Pro API Access</span>
+      <span className="text-sm font-medium text-gray-900">$49 / mo</span>
+    </div>
+  </div>
+);
+
+// --- 2. The Main Chatbot Component ---
+export default function CrmChatbot() {
+  const [messages, setMessages] = useState([
+    { sender: 'bot', text: 'Hello! I am your CRM assistant. How can I help you today?' }
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  
-  const [sessionId, setSessionId] = useState(`session_${Math.random().toString(36).substring(2, 9)}`);
-  
-  const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-  useEffect(() => scrollToBottom(), [messages]);
-
-  const handleVoiceInput = (e) => {
+  const sendMessage = async (e) => {
     e.preventDefault();
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice recognition is not supported in this browser.");
-      return;
-    }
+    if (!input.trim()) return;
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-
-    recognition.onstart = () => setIsListening(true);
-    recognition.onresult = (event) => setInput((prev) => (prev + " " + event.results[0][0].transcript).trim());
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-    recognition.start();
-  };
-
-  const sendMessage = async (text) => {
-    if (!text.trim()) return;
-
-    const userMessage = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMessage]);
+    const userMsg = { sender: 'user', text: input };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // 🚨 REPLACE THIS URL WITH YOUR LOCALTUNNEL PORT 8000 URL
+      // 🚨 REPLACE THIS URL with your actual live Render backend URL
       const response = await fetch('https://crm-backend-z5d9.onrender.com/chat', {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Bypass-Tunnel-Reminder': 'true' // Bypasses Localtunnel security screen
-        },
-        body: JSON.stringify({ message: text, user_id: sessionId }) 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: userMsg.text }),
       });
 
-      if (!response.ok) throw new Error('Network error');
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'bot', text: data.reply } // Make sure 'reply' matches your Python return key
+      ]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Our servers are currently busy. Please try again later.' }]);
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'bot', text: 'Sorry, I am having trouble connecting to the server.' }
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    sendMessage(input);
-  };
-
-  const handleEndChat = () => {
-    if (window.confirm("Are you sure you want to end this chat and clear your history?")) {
-      setMessages([defaultWelcomeMessage]); 
-      setSessionId(`session_${Math.random().toString(36).substring(2, 9)}`); 
-      setInput(''); 
-    }
-  };
-
   return (
-    <div className="flex flex-col h-[600px] w-full max-w-md border border-gray-200 rounded-2xl shadow-2xl bg-white font-sans overflow-hidden">
-      <div className="bg-teal-600 text-white p-4 flex justify-between items-center shadow-md z-10">
-        <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-inner">💬</div>
-            <div>
-                <h3 className="font-bold text-lg leading-tight">Customer Support</h3>
-                <span className="text-xs text-teal-100 flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    Online & Ready to Help
-                </span>
-            </div>
-        </div>
-        <button onClick={handleEndChat} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-teal-700 text-teal-100 hover:text-white transition-colors" title="End Chat">✕</button>
+    <div className="flex flex-col h-screen max-w-2xl mx-auto bg-gray-50 font-sans">
+      {/* Header */}
+      <div className="bg-white px-6 py-4 border-b border-gray-200 shadow-sm">
+        <h1 className="text-xl font-semibold text-gray-800">CRM AI Assistant</h1>
       </div>
 
-      <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`mb-4 flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-wrap text-sm shadow-sm ${msg.role === 'user' ? 'bg-teal-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'}`}>
-              {msg.content}
+      {/* Chat History */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.map((msg, index) => (
+          <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+              msg.sender === 'user' 
+                ? 'bg-blue-600 text-white rounded-br-none' 
+                : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
+            }`}>
+              
+              {/* TRIGGER LOGIC: Check if it's a bot message AND contains the trigger word */}
+              {msg.sender === 'bot' && msg.text.includes('[SHOW_PRICING]') ? (
+                <div>
+                  <span className="whitespace-pre-wrap">
+                    {msg.text.replace('[SHOW_PRICING]', '')}
+                  </span>
+                  <MenuPricing />
+                </div>
+              ) : (
+                <span className="whitespace-pre-wrap">{msg.text}</span>
+              )}
+
             </div>
-            {idx === 0 && messages.length === 1 && (
-              <div className="flex flex-wrap gap-2 mt-3 ml-1">
-                {["💰 What is the pricing?", "🛠️ I need technical support", "🚀 Can I get a demo?"].map((suggestion, sIdx) => (
-                  <button key={sIdx} onClick={() => sendMessage(suggestion)} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-3 py-1.5 rounded-full hover:bg-teal-600 hover:text-white transition-colors shadow-sm font-medium">
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         ))}
-        {isLoading && <div className="text-left text-gray-400 text-xs animate-pulse ml-2">Agent is typing...</div>}
-        <div ref={messagesEndRef} />
+        
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-gray-200 text-gray-500 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm text-sm">
+              Typing...
+            </div>
+          </div>
+        )}
       </div>
 
-      <form onSubmit={handleSend} className="p-3 bg-white border-t border-gray-100 flex gap-2 items-center">
-        <button type="button" onClick={handleVoiceInput} disabled={isListening || isLoading} className={`p-2 rounded-full transition-all flex-shrink-0 ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="Speak to us">
-          {isListening ? '🎙️' : '🎤'}
-        </button>
-        <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={isListening ? "Listening..." : "Type your message..."} className="flex-1 p-3 bg-gray-100 border-none rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm" disabled={isLoading || isListening} />
-        <button type="submit" disabled={isLoading || !input.trim()} className="bg-teal-600 text-white px-5 py-2.5 rounded-xl hover:bg-teal-700 disabled:bg-teal-300 transition-colors flex-shrink-0 font-medium text-sm shadow-md">Send</button>
+      {/* Input Area */}
+      <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about our pricing..."
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="px-6 py-2 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            Send
+          </button>
+        </div>
       </form>
     </div>
   );
-};
-
-export default CrmChatbot;
+}
