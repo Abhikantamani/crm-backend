@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-// --- 1. The Minimalist Pricing Component ---
+// --- The Minimalist Pricing Component ---
 const MenuPricing = () => (
   <div className="flex flex-col gap-2 w-full max-w-sm mt-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Pricing List</h3>
@@ -22,7 +22,7 @@ const MenuPricing = () => (
   </div>
 );
 
-// --- 2. The Main Chatbot Component ---
+// --- The Main Chatbot Component ---
 export default function CrmChatbot() {
   const [messages, setMessages] = useState([
     { sender: 'bot', text: 'Hello! I am your CRM assistant. How can I help you today?' }
@@ -40,23 +40,30 @@ export default function CrmChatbot() {
     setIsLoading(true);
 
     try {
-      // 🚨 REPLACE THIS URL with your actual live Render backend URL
+      // Your live Render backend URL
       const response = await fetch('https://crm-backend-z5d9.onrender.com/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Sending data as "text" to match the FastAPI backend perfectly
         body: JSON.stringify({ text: userMsg.text }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       
       setMessages((prev) => [
         ...prev,
-        { sender: 'bot', text: data.reply } // Make sure 'reply' matches your Python return key
+        // Expecting the backend to return {"reply": "..."}
+        { sender: 'bot', text: data.reply } 
       ]);
     } catch (error) {
+      console.error("Fetch Error:", error);
       setMessages((prev) => [
         ...prev,
-        { sender: 'bot', text: 'Sorry, I am having trouble connecting to the server.' }
+        { sender: 'bot', text: 'Sorry, I am having trouble connecting to the server. Please try again.' }
       ]);
     } finally {
       setIsLoading(false);
@@ -65,12 +72,10 @@ export default function CrmChatbot() {
 
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto bg-gray-50 font-sans">
-      {/* Header */}
       <div className="bg-white px-6 py-4 border-b border-gray-200 shadow-sm">
         <h1 className="text-xl font-semibold text-gray-800">CRM AI Assistant</h1>
       </div>
 
-      {/* Chat History */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -80,7 +85,7 @@ export default function CrmChatbot() {
                 : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
             }`}>
               
-              {/* TRIGGER LOGIC: Check if it's a bot message AND contains the trigger word */}
+              {/* Trigger logic for the pricing UI */}
               {msg.sender === 'bot' && msg.text.includes('[SHOW_PRICING]') ? (
                 <div>
                   <span className="whitespace-pre-wrap">
@@ -96,7 +101,6 @@ export default function CrmChatbot() {
           </div>
         ))}
         
-        {/* Loading Indicator */}
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 text-gray-500 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm text-sm">
@@ -106,7 +110,6 @@ export default function CrmChatbot() {
         )}
       </div>
 
-      {/* Input Area */}
       <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
         <div className="flex gap-2">
           <input

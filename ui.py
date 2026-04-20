@@ -1,23 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-# import your AI libraries here (e.g., openai, google.generativeai, etc.)
 
 app = FastAPI()
 
-# 🚨 REQUIRED FOR VERCEL TO TALK TO RENDER
+# Allow your Vercel frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, you can replace "*" with your Vercel URL
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# THIS IS THE FIX FOR THE 422 ERROR
+# It strictly tells FastAPI to expect JSON looking like: {"text": "hello"}
 class UserMessage(BaseModel):
     text: str
 
-# 1. Your System Prompt / Data Dump
 SYSTEM_PROMPT = """
 You are a highly professional sales assistant for our CRM platform. 
 Answer user questions concisely and accurately.
@@ -32,21 +32,15 @@ CRITICAL RULE: If the user asks about pricing, cost, plans, or fees, you must gi
 
 @app.post("/chat")
 async def chat_endpoint(message: UserMessage):
-    user_text = message.text
+    # message.text matches the BaseModel perfectly
+    user_text = message.text.lower()
     
-    # ---------------------------------------------------------
-    # 2. YOUR AI LOGIC GOES HERE
-    # Connect to your LLM (LLAMA, OpenAI, Gemini, etc.) and pass 
-    # both the SYSTEM_PROMPT and the user_text.
-    #
-    # Example placeholder logic if you don't have the AI hooked up yet:
-    # ---------------------------------------------------------
-    
-    user_text_lower = user_text.lower()
-    if "price" in user_text_lower or "cost" in user_text_lower or "plan" in user_text_lower:
+    # Simple logic check to trigger the UI component
+    if "price" in user_text or "cost" in user_text or "plan" in user_text:
         ai_response = "We have a few flexible plans to fit your needs! [SHOW_PRICING]"
     else:
-        ai_response = f"You said: {user_text}. I am a CRM bot, how can I help you today?"
+        # If you have an LLM hooked up, its response would go here instead.
+        ai_response = f"You said: '{message.text}'. I am a CRM bot, ask me about our pricing!"
 
-    # Return the response to the React frontend
+    # Returning exactly what React is looking for (data.reply)
     return {"reply": ai_response}
