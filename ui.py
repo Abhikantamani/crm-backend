@@ -32,15 +32,13 @@ CRITICAL RULE: If the user asks about pricing, cost, plans, or fees, you must gi
 
 @app.post("/chat")
 async def chat_endpoint(message: UserMessage):
-    # message.text matches the BaseModel perfectly
+    # Force everything to lowercase so it always matches
     user_text = message.text.lower()
     
-    # Simple logic check to trigger the UI component
-    if "price" in user_text or "cost" in user_text or "plan" in user_text:
+    # Bulletproof check for any variation of the word
+    if "price" in user_text or "pricing" in user_text or "cost" in user_text or "plan" in user_text:
         ai_response = "We have a few flexible plans to fit your needs! [SHOW_PRICING]"
     else:
-        # If you have an LLM hooked up, its response would go here instead.
         ai_response = f"You said: '{message.text}'. I am a CRM bot, ask me about our pricing!"
 
-    # Returning exactly what React is looking for (data.reply)
     return {"reply": ai_response}
