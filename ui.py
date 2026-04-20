@@ -40,7 +40,7 @@ async def chat(msg: UserMessage):
     state = msg.state
     data  = dict(msg.data)
 
-    if any(kw in low for kw in RESET_KEYWORDS):
+    if any(re.search(r'\b' + kw + r'\b', low) for kw in RESET_KEYWORDS):
         return reply(WELCOME)
 
     if state == "IDLE":
