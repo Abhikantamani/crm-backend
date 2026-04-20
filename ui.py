@@ -32,13 +32,24 @@ CRITICAL RULE: If the user asks about pricing, cost, plans, or fees, you must gi
 
 @app.post("/chat")
 async def chat_endpoint(message: UserMessage):
-    # Force everything to lowercase so it always matches
     user_text = message.text.lower()
     
-    # Bulletproof check for any variation of the word
-    if "price" in user_text or "pricing" in user_text or "cost" in user_text or "plan" in user_text:
-        ai_response = "We have a few flexible plans to fit your needs! [SHOW_PRICING]"
+    # 1. NEW FEATURE: Pricing UI Trigger
+    if any(word in user_text for word in ["price", "pricing", "cost", "plan"]):
+        return {"reply": "We have a few flexible plans to fit your needs! [SHOW_PRICING]"}
+    
+    # 2. RESTORED FEATURE: Bug Reporting
+    elif any(word in user_text for word in ["bug", "error", "issue", "broken"]):
+        return {"reply": "I'm sorry to hear you found a bug. Please describe the issue, or type 'report' to open a ticket."}
+    
+    # 3. RESTORED FEATURE: Demo Requests
+    elif "demo" in user_text:
+        return {"reply": "I'd love to show you a demo! You can book a live session here: [DEMO_LINK_STUB] or ask me about specific features."}
+    
+    # 4. RESTORED FEATURE: Customer Support
+    elif "support" in user_text or "help" in user_text:
+        return {"reply": "Our support team is available 24/7. Would you like to see our FAQ or speak to a human?"}
+    
+    # 5. GENERAL FALLBACK
     else:
-        ai_response = f"You said: '{message.text}'. I am a CRM bot, ask me about our pricing!"
-
-    return {"reply": ai_response}
+        return {"reply": f"I received your message: '{message.text}'. How can I assist you with our CRM features, pricing, or bug reporting today?"}
