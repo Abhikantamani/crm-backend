@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const BACKEND_URL = 'https://crm-backend-z5d9.onrender.com';
 
-// ── Session ID generator ──────────────────────────────────────
 function generateSessionId() {
   return 'session_' + Math.random().toString(36).substring(2, 9);
 }
 
-// ── Pricing Card Component ────────────────────────────────────
+// ── Pricing Card ──────────────────────────────────────────────
 const MenuPricing = () => (
   <div className="mt-3 w-full max-w-xs rounded-2xl border border-teal-100 bg-white shadow-md overflow-hidden">
     <div className="bg-teal-600 px-4 py-2">
@@ -15,9 +14,9 @@ const MenuPricing = () => (
     </div>
     <div className="divide-y divide-slate-100">
       {[
-        { label: 'Initial Setup',  price: '$100',     note: 'one-time fee' },
-        { label: 'Basic Monthly',  price: '$15',      note: 'per month' },
-        { label: 'Pro API Access', price: '$49',      note: 'per month' },
+        { label: 'Initial Setup',  price: '$100', note: 'one-time fee' },
+        { label: 'Basic Monthly',  price: '$15',  note: 'per month' },
+        { label: 'Pro API Access', price: '$49',  note: 'per month' },
       ].map(({ label, price, note }) => (
         <div key={label} className="flex items-center justify-between px-4 py-3">
           <span className="text-sm text-slate-600">{label}</span>
@@ -33,7 +32,6 @@ const MenuPricing = () => (
 
 // ── Markdown-lite renderer ────────────────────────────────────
 function renderText(text) {
-  // Bold: **text**
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**'))
@@ -44,6 +42,7 @@ function renderText(text) {
   });
 }
 
+// ── Message Bubble ────────────────────────────────────────────
 function MessageBubble({ msg }) {
   const isBot = msg.sender === 'bot';
   const hasPricing = isBot && msg.text.includes('[SHOW_PRICING]');
@@ -56,7 +55,7 @@ function MessageBubble({ msg }) {
           <span className="text-white text-xs font-bold">C</span>
         </div>
       )}
-      <div className={`max-w-[80%] ${isBot ? '' : 'order-first'}`}>
+      <div className="max-w-[80%]">
         <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
           isBot
             ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
@@ -73,16 +72,17 @@ function MessageBubble({ msg }) {
 // ── Main Chatbot Component ────────────────────────────────────
 export default function CrmChatbot() {
   const sessionId = useRef(generateSessionId());
-
-  const [messages, setMessages] = useState([
-    {
-      sender: 'bot',
-      text: "👋 Welcome to CRM Assistant! I can help you with:\n\n• 💰 **Pricing & Plans** — ask about our costs\n• 🎯 **Demo Request** — get a live walkthrough\n• 🐛 **Bug Reports** — log a support ticket\n• 🔍 **Ticket Status** — look up a TICK-### ID\n\nWhat can I help you with today?"
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const bottomRef = useRef(null);
+
+  const WELCOME_MSG = "👋 Welcome to CRM Assistant! I can help you with:\n\n• 💰 **Pricing & Plans** — ask about our costs\n• 🎯 **Demo Request** — get a live walkthrough\n• 🐛 **Bug Reports** — log a support ticket\n• 🔍 **Ticket Status** — look up a TICK-### ID\n\nWhat can I help you with today?";
+
+  const [messages,  setMessages]  = useState([{ sender: 'bot', text: WELCOME_MSG }]);
+  const [input,     setInput]     = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Client-side FSM state — travels with every request to the backend
+  const [convState, setConvState] = useState('IDLE');
+  const [convData,  setConvData]  = useState({});
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,18 +101,29 @@ export default function CrmChatbot() {
       const res = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, user_id: sessionId.current }),
+        body: JSON.stringify({
+          message: text,
+          user_id: sessionId.current,
+          state:   convState,
+          data:    convData,
+        }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
 
-      setMessages(prev => [...prev, { sender: 'bot', text: data.response }]);
+      const result = await res.json();
+
+      // Save the new FSM state returned by the backend
+      setConvState(result.state || 'IDLE');
+      setConvData(result.data   || {});
+
+      setMessages(prev => [...prev, { sender: 'bot', text: result.response }]);
+
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: '⚠️ Sorry, I\'m having trouble connecting to the server. Please try again in a moment.'
+        text: "⚠️ Sorry, I'm having trouble connecting to the server. Please try again in a moment."
       }]);
     } finally {
       setIsLoading(false);
@@ -121,14 +132,14 @@ export default function CrmChatbot() {
 
   const handleReset = () => {
     sessionId.current = generateSessionId();
-    setMessages([{
-      sender: 'bot',
-      text: "👋 Welcome to CRM Assistant! I can help you with:\n\n• 💰 **Pricing & Plans** — ask about our costs\n• 🎯 **Demo Request** — get a live walkthrough\n• 🐛 **Bug Reports** — log a support ticket\n• 🔍 **Ticket Status** — look up a TICK-### ID\n\nWhat can I help you with today?"
-    }]);
+    setConvState('IDLE');
+    setConvData({});
+    setMessages([{ sender: 'bot', text: WELCOME_MSG }]);
   };
 
   return (
     <div className="flex flex-col h-[600px] bg-slate-50 rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
+
       {/* Header */}
       <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
@@ -194,6 +205,7 @@ export default function CrmChatbot() {
           </button>
         </div>
       </form>
+
     </div>
   );
 }
