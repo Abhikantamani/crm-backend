@@ -14,14 +14,14 @@ const PricingCard = () => (
     </div>
     <div className="divide-y divide-slate-100">
       {[
-        { label: 'Basic',      price: '₹8,000',  note: '/month · up to 5 users',      highlight: false },
-        { label: 'Pro',        price: '₹20,000', note: '/month · up to 20 users',     highlight: true  },
-        { label: 'Enterprise', price: '₹45,000', note: '/month · unlimited users',    highlight: false },
-      ].map(({ label, price, note, highlight }) => (
-        <div key={label} className={`flex items-center justify-between px-4 py-3 ${highlight ? 'bg-teal-50' : ''}`}>
+        { label: 'Basic',      price: '₹8,000',  note: '/month · up to 5 users',      tag: null       },
+        { label: 'Pro',        price: '₹20,000', note: '/month · up to 20 users',     tag: 'Popular'  },
+        { label: 'Enterprise', price: '₹45,000', note: '/month · unlimited users',    tag: null       },
+      ].map(({ label, price, note, tag }) => (
+        <div key={label} className={`flex items-center justify-between px-4 py-3 ${tag ? 'bg-teal-50' : ''}`}>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-700">{label}</span>
-            {highlight && <span className="text-[10px] bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">Popular</span>}
+            {tag && <span className="text-[10px] bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">{tag}</span>}
           </div>
           <div className="text-right">
             <span className="text-sm font-bold text-slate-900">{price}</span>
@@ -30,8 +30,8 @@ const PricingCard = () => (
         </div>
       ))}
     </div>
-    <div className="px-4 py-2 bg-slate-50 text-xs text-slate-500 text-center">
-      All plans include 30-day free trial
+    <div className="px-4 py-2 bg-slate-50 text-xs text-slate-400 text-center">
+      All plans include 30-day free trial · No credit card required
     </div>
   </div>
 );
@@ -39,27 +39,37 @@ const PricingCard = () => (
 // ── Markdown renderer ─────────────────────────────────────────
 function renderMarkdown(text) {
   return text.split('\n').map((line, i) => {
+    const isLast = i === text.split('\n').length - 1;
+    // Table row
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.split('|').filter(c => c.trim() !== '');
+      const isSep = cells.every(c => /^[-: ]+$/.test(c));
+      if (isSep) return null;
+      return (
+        <div key={i} className="flex text-xs font-mono border-b border-slate-100 last:border-0">
+          {cells.map((cell, j) => (
+            <span key={j} className="flex-1 px-2 py-1 text-slate-700">{cell.trim()}</span>
+          ))}
+        </div>
+      );
+    }
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
     const rendered = parts.map((part, j) => {
       if (part.startsWith('**') && part.endsWith('**'))
-        return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
+        return <strong key={j}>{part.slice(2, -2)}</strong>;
       if (part.startsWith('`') && part.endsWith('`'))
         return <code key={j} className="bg-slate-100 text-teal-700 px-1.5 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
       if (part.startsWith('*') && part.endsWith('*'))
         return <em key={j}>{part.slice(1, -1)}</em>;
-      // Render | table rows as formatted text
-      if (line.startsWith('|') && line.endsWith('|')) {
-        return <span key={j} className="font-mono text-xs">{part}</span>;
-      }
       return <span key={j}>{part}</span>;
     });
-    return <span key={i}>{rendered}{i < text.split('\n').length - 1 ? '\n' : ''}</span>;
-  });
+    return <span key={i}>{rendered}{!isLast ? '\n' : ''}</span>;
+  }).filter(Boolean);
 }
 
 // ── Message Bubble ────────────────────────────────────────────
 function MessageBubble({ msg }) {
-  const isBot     = msg.sender === 'bot';
+  const isBot      = msg.sender === 'bot';
   const hasPricing = isBot && msg.text.includes('[SHOW_PRICING]');
   const cleanText  = msg.text.replace('[SHOW_PRICING]', '').trim();
 
@@ -79,7 +89,7 @@ function MessageBubble({ msg }) {
           {isBot ? renderMarkdown(cleanText) : cleanText}
         </div>
         {hasPricing && <PricingCard />}
-        <p className={`text-[10px] mt-1 ${isBot ? 'text-slate-400 ml-1' : 'text-slate-400 text-right'}`}>
+        <p className={`text-[10px] mt-1 text-slate-400 ${isBot ? 'ml-1' : 'text-right'}`}>
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
@@ -87,12 +97,12 @@ function MessageBubble({ msg }) {
   );
 }
 
-// ── Quick Reply Chips ─────────────────────────────────────────
-const QUICK_REPLIES = [
+// ── Quick Chips ───────────────────────────────────────────────
+const CHIPS = [
   "What is your pricing?",
   "I want a demo",
   "I found a bug",
-  "Show dashboard",
+  "What is the next best action?",
 ];
 
 // ── Main Component ────────────────────────────────────────────
@@ -101,9 +111,9 @@ export default function CrmChatbot() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
-  const WELCOME_MSG = "👋 Hello! I'm your **AI Sales Assistant** for NexCRM.\n\nI can help you with:\n• 💰 Pricing & Plans\n• 🎯 Book a Demo\n• 📋 Create a Deal or Proposal\n• 🐛 Raise a Support Ticket\n• 📊 View Dashboard & Pipeline *(say 'show dashboard')*\n\nWhat can I help you with today?";
+  const WELCOME = "👋 Hello! I'm your **AI Sales Assistant** for NexCRM.\n\nHow can I help you today?\n\n• 💰 **Pricing & Plans** — find the right package\n• 🎯 **Book a Demo** — see NexCRM in action\n• 📋 **Proposal / Deal** — get a personalised quote\n• 🐛 **Support Ticket** — report an issue\n• 🤖 **Features** — learn what NexCRM offers\n\nWould you like **pricing information** or to **book a demo**?";
 
-  const [messages,  setMessages]  = useState([{ sender: 'bot', text: WELCOME_MSG }]);
+  const [messages,  setMessages]  = useState([{ sender: 'bot', text: WELCOME }]);
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [convState, setConvState] = useState('IDLE');
@@ -116,26 +126,22 @@ export default function CrmChatbot() {
   const send = async (text) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
-
     setMessages(prev => [...prev, { sender: 'user', text: trimmed }]);
     setInput('');
     setIsLoading(true);
-
     try {
       const res = await fetch(`${BACKEND_URL}/chat`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message:  trimmed,
-          user_id:  sessionId.current,
-          state:    convState,
-          data:     convData,
+          message: trimmed,
+          user_id: sessionId.current,
+          state:   convState,
+          data:    convData,
         }),
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
-
       setConvState(result.state || 'IDLE');
       setConvData(result.data   || {});
       setMessages(prev => [...prev, { sender: 'bot', text: result.response }]);
@@ -143,7 +149,7 @@ export default function CrmChatbot() {
       console.error(err);
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: "⚠️ I'm having trouble connecting right now. Please try again in a moment."
+        text: "⚠️ I'm having trouble connecting right now. Please try again in a moment.\n\n*(If this is the first message, Render may be waking up — please wait 30 seconds and try again)*"
       }]);
     } finally {
       setIsLoading(false);
@@ -152,13 +158,12 @@ export default function CrmChatbot() {
   };
 
   const handleSubmit = (e) => { e.preventDefault(); send(input); };
-  const handleChip   = (chip) => send(chip);
 
   const handleReset = () => {
     sessionId.current = generateSessionId();
     setConvState('IDLE');
     setConvData({});
-    setMessages([{ sender: 'bot', text: WELCOME_MSG }]);
+    setMessages([{ sender: 'bot', text: WELCOME }]);
   };
 
   const showChips = messages.length <= 2 && !isLoading;
@@ -166,7 +171,7 @@ export default function CrmChatbot() {
   return (
     <div className="flex flex-col h-[640px] bg-slate-50 rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="bg-white px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-md">
@@ -181,20 +186,19 @@ export default function CrmChatbot() {
           </div>
         </div>
         <button onClick={handleReset}
-          className="text-xs text-slate-400 hover:text-teal-600 transition-colors px-3 py-1.5 rounded-full hover:bg-teal-50 font-medium">
+          className="text-xs text-slate-400 hover:text-teal-600 transition px-3 py-1.5 rounded-full hover:bg-teal-50 font-medium">
           New Chat
         </button>
       </div>
 
-      {/* ── Messages ── */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
         {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
 
-        {/* Quick reply chips */}
         {showChips && (
           <div className="flex flex-wrap gap-2 mb-3 ml-10">
-            {QUICK_REPLIES.map(chip => (
-              <button key={chip} onClick={() => handleChip(chip)}
+            {CHIPS.map(chip => (
+              <button key={chip} onClick={() => send(chip)}
                 className="text-xs bg-white border border-teal-200 text-teal-700 px-3 py-1.5 rounded-full hover:bg-teal-50 hover:border-teal-400 transition font-medium shadow-sm">
                 {chip}
               </button>
@@ -202,7 +206,6 @@ export default function CrmChatbot() {
           </div>
         )}
 
-        {/* Typing indicator */}
         {isLoading && (
           <div className="flex justify-start mb-4">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center mr-2.5 mt-1 flex-shrink-0">
@@ -210,7 +213,7 @@ export default function CrmChatbot() {
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
               <div className="flex gap-1 items-center h-4">
-                {[0,150,300].map(d => (
+                {[0, 150, 300].map(d => (
                   <span key={d} className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
                     style={{ animationDelay: `${d}ms` }} />
                 ))}
@@ -221,12 +224,12 @@ export default function CrmChatbot() {
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Input ── */}
+      {/* Input */}
       <form onSubmit={handleSubmit} className="px-4 py-3 bg-white border-t border-slate-100">
         <div className="flex gap-2 items-center">
           <input ref={inputRef} type="text" value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask about pricing, demo, support..."
+            placeholder="Ask about pricing, demo, features..."
             disabled={isLoading}
             className="flex-1 px-4 py-2.5 text-sm bg-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 focus:bg-white transition disabled:opacity-50 text-slate-800 placeholder-slate-400"
           />
