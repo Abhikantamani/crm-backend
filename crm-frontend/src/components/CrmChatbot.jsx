@@ -11,13 +11,13 @@ function generateSessionId() {
 const PricingCard = () => (
   <div className="mt-3 w-full max-w-sm overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-lg">
     <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5">
-      <p className="text-xs font-bold uppercase tracking-widest text-white">{COMPANY_NAME} CRM</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-white">{COMPANY_NAME}</p>
     </div>
     <div className="px-4 py-3 text-sm text-slate-700">
-      For plan details, a product walkthrough, or a custom CRM quote, ask for a demo and our team will assist you.
+      For product details, a walkthrough, or a custom quote, ask for a demo and our team will assist you.
     </div>
     <div className="bg-slate-50 px-4 py-2 text-center text-xs text-slate-400">
-      CRM demos, onboarding help, and support guidance are available here
+      Demos, onboarding help, and support guidance are available here
     </div>
   </div>
 );
@@ -108,8 +108,8 @@ function MessageBubble({ msg }) {
 }
 
 const CHIPS = [
-  'Show your CRM features',
-  'I want a CRM demo',
+  'Show your features',
+  'I want a demo',
   'Create a support ticket',
   'How do you handle leads?',
 ];
@@ -121,7 +121,7 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef = useRef('');
 
-  const WELCOME = `Hello! I am your **${ASSISTANT_NAME}** for **${COMPANY_NAME}**.\n\nI can help only with CRM-related topics such as demos, features, lead handling, support tickets, and onboarding.\n\nHow can I help you with your CRM today?`;
+  const WELCOME = `Hello! I am your **${ASSISTANT_NAME}** for **${COMPANY_NAME}**.\n\nI can help with product details, demos, lead handling, support tickets, and onboarding.\n\nHow can I help you today?`;
 
   const [messages, setMessages] = useState([{ sender: 'bot', text: WELCOME }]);
   const [input, setInput] = useState('');
@@ -282,7 +282,7 @@ export default function CrmChatbot() {
             <p className="text-sm font-bold text-slate-800">{ASSISTANT_NAME}</p>
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-              <p className="text-xs font-medium text-green-600">Online and focused on CRM support only</p>
+              <p className="text-xs font-medium text-green-600">Online now</p>
             </div>
           </div>
         </div>
@@ -342,7 +342,7 @@ export default function CrmChatbot() {
             type="text"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Ask about Future Invo Solutions CRM..."
+            placeholder="Type your message..."
             disabled={isLoading}
             className="flex-1 rounded-full bg-slate-100 px-4 py-2.5 text-sm text-slate-800 transition placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:opacity-50"
           />
@@ -387,7 +387,7 @@ export default function CrmChatbot() {
               ? 'Listening now. Speak and your words will appear in the input box.'
               : isSpeechSupported
                 ? 'Use the microphone button if you prefer speaking instead of typing.'
-                : `${ASSISTANT_NAME} is focused on CRM questions only.`}
+                : `${ASSISTANT_NAME} is ready to help.`}
         </div>
       </form>
     </div>
