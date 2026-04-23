@@ -91,7 +91,7 @@ function renderMarkdown(text) {
 
 function MessageBubble({ msg }) {
   const isBot = msg.sender === 'bot';
-  const hasPricing = isBot && /pricing|quote|plan|demo/i.test(msg.text);
+  const hasPricing = isBot && Boolean(msg.showPricingCard);
 
   return (
     <div className={`mb-4 flex ${isBot ? 'justify-start' : 'justify-end'}`}>
@@ -134,9 +134,9 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef = useRef('');
 
-  const WELCOME = 'Hello! I am your CRM bot from Future Invo Solutions.\n\nI can help with pricing, features, demos, lead handling, pipeline tracking, support tickets, and onboarding.';
+  const WELCOME = 'Hello! I am your CRM bot from Future Invo Solutions.\n\nI can help with pricing, features, demos, lead handling, pipeline tracking, customer 360 view, support tickets, automation, and onboarding.';
 
-  const [messages, setMessages] = useState([{ sender: 'bot', text: WELCOME }]);
+  const [messages, setMessages] = useState([{ sender: 'bot', text: WELCOME, showPricingCard: true }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [convState, setConvState] = useState('IDLE');
@@ -235,7 +235,7 @@ export default function CrmChatbot() {
       setConvState(result.state || 'IDLE');
       setConvData(result.data || {});
       setConvHistory([...updatedHistory, { role: 'assistant', content: botReply }]);
-      setMessages((prev) => [...prev, { sender: 'bot', text: botReply }]);
+      setMessages((prev) => [...prev, { sender: 'bot', text: botReply, showPricingCard: false }]);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
@@ -243,6 +243,7 @@ export default function CrmChatbot() {
         {
           sender: 'bot',
           text: 'I am having trouble connecting right now. Please try again in a moment.',
+          showPricingCard: false,
         },
       ]);
     } finally {
@@ -265,7 +266,7 @@ export default function CrmChatbot() {
     setSpeechError('');
     setIsListening(false);
     recognitionRef.current?.stop();
-    setMessages([{ sender: 'bot', text: WELCOME }]);
+    setMessages([{ sender: 'bot', text: WELCOME, showPricingCard: true }]);
   };
 
   const toggleVoiceInput = () => {

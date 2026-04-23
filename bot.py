@@ -110,6 +110,37 @@ async def chat_endpoint(payload: ChatMessage):
             )
         }
 
+    if current_state is None and any(word in msg for word in ["lead", "leads", "lead scoring"]):
+        return {
+            "response": (
+                "**Lead Management**\n"
+                "- Capture lead details and contact information\n"
+                "- Score leads automatically\n"
+                "- Track follow-ups and handoff to deals\n"
+                "- Keep communication history connected to each lead"
+            )
+        }
+
+    if current_state is None and any(word in msg for word in ["pipeline", "deal stage", "sales stage"]):
+        return {
+            "response": (
+                "**Sales Pipeline**\n"
+                "- New -> Qualified -> Demo -> Proposal -> Negotiation -> Closed Won/Lost\n"
+                "- Track deal value, stage, and win probability\n"
+                "- Monitor active opportunities across the pipeline"
+            )
+        }
+
+    if current_state is None and any(word in msg for word in ["360", "customer profile"]):
+        return {
+            "response": (
+                "**Customer 360 View**\n"
+                "- Keep customer details in one place\n"
+                "- View support history, lead activity, and communication records\n"
+                "- Help sales and support teams work from the same profile"
+            )
+        }
+
     if current_state is None and not is_crm_related(raw_msg):
         return {
             "response": (

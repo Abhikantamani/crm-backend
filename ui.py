@@ -196,6 +196,92 @@ def features_response() -> str:
         "If you want, I can explain any feature in more detail."
     )
 
+
+def leads_response() -> str:
+    return (
+        "**Lead Management**\n"
+        "- Capture leads with name, email, phone, company, and team size\n"
+        "- Score each lead automatically from 0 to 100\n"
+        "- Track follow-ups and convert qualified leads into deals\n"
+        "- Keep communication history in one place\n"
+        "- Prioritize hot leads for the sales team\n\n"
+        "If you want, I can also explain how lead scoring works."
+    )
+
+
+def pipeline_response() -> str:
+    return (
+        "**Sales Pipeline**\n"
+        "- Track deals through **New -> Qualified -> Demo -> Proposal -> Negotiation -> Closed Won/Lost**\n"
+        "- View deal value, stage, and win probability\n"
+        "- Monitor total pipeline value and active opportunities\n"
+        "- Move deals forward as the conversation progresses\n\n"
+        "If you want, I can also explain each pipeline stage."
+    )
+
+
+def customer_360_response() -> str:
+    return (
+        "**Customer 360 View**\n"
+        "- See the full customer profile in one place\n"
+        "- Track contact details, company data, and team size\n"
+        "- Review lead score, deal activity, and support history\n"
+        "- Keep calls, email, WhatsApp, and notes connected to the same record\n\n"
+        "If you want, I can show how this helps sales and support teams."
+    )
+
+
+def automation_response() -> str:
+    return (
+        "**Automation and Workflows**\n"
+        "- Trigger follow-up actions automatically after lead capture\n"
+        "- Schedule reminders, demo tasks, and proposal steps\n"
+        "- Log communication activity across channels\n"
+        "- Support structured handoff from sales to support\n\n"
+        "If you want, I can explain the workflow examples in more detail."
+    )
+
+
+def support_response() -> str:
+    return (
+        "**Support and Ticketing**\n"
+        "- Create support tickets for login issues, bugs, and account problems\n"
+        "- Track tickets with a ticket ID such as `TICK-100`\n"
+        "- Keep issue details linked to the customer record\n"
+        "- Help the team review status and ongoing updates\n\n"
+        "If you want, I can help create a support ticket right now."
+    )
+
+
+def is_lead_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    lead_terms = ("lead", "leads", "lead scoring", "lead management", "follow-up", "follow up")
+    return any(term in lowered for term in lead_terms)
+
+
+def is_pipeline_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    pipeline_terms = ("pipeline", "deal stage", "deal stages", "sales stages", "sales pipeline")
+    return any(term in lowered for term in pipeline_terms)
+
+
+def is_customer_360_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    customer_terms = ("360 view", "customer 360", "customer profile", "full customer profile")
+    return any(term in lowered for term in customer_terms)
+
+
+def is_automation_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    automation_terms = ("automation", "workflow", "workflows", "automatic follow-up", "automated follow-up")
+    return any(term in lowered for term in automation_terms)
+
+
+def is_support_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    support_terms = ("support", "ticket", "tickets", "issue", "issues", "bug", "bugs", "login")
+    return any(term in lowered for term in support_terms)
+
 # ─────────────────────────────────────────────────────────────
 # DB HELPERS
 # ─────────────────────────────────────────────────────────────
@@ -569,6 +655,41 @@ async def chat(msg: UserMessage):
     if is_feature_query(raw):
         return {
             "response": features_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_lead_query(raw):
+        return {
+            "response": leads_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_pipeline_query(raw):
+        return {
+            "response": pipeline_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_customer_360_query(raw):
+        return {
+            "response": customer_360_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_automation_query(raw):
+        return {
+            "response": automation_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_support_query(raw) and not is_explicit_demo_request(raw):
+        return {
+            "response": support_response(),
             "state": "IDLE",
             "data": data,
         }
