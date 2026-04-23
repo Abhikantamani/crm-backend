@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI          # Grok uses OpenAI-compatible SDK
+from groq import Groq          # GroqCloud official SDK
 import re, random, os
 from datetime import datetime, timedelta
 
@@ -10,16 +10,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
 # ─────────────────────────────────────────────────────────────
-# GROK CLIENT SETUP
-# Replace YOUR_GROK_API_KEY with your actual key
-# OR set environment variable: GROK_API_KEY=xai-xxxxx
+# GROQCLOUD CLIENT SETUP
+# Set environment variable on Render: GROQ_API_KEY=gsk_xxxxx
 # ─────────────────────────────────────────────────────────────
-GROK_API_KEY = os.environ.get("GROK_API_KEY", "YOUR_GROK_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "YOUR_GROQ_API_KEY")
 
-grok_client = OpenAI(
-    api_key=GROK_API_KEY,
-    base_url="https://api.x.ai/v1",
-)
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 # ─────────────────────────────────────────────────────────────
 # REQUEST SCHEMA
@@ -29,7 +25,7 @@ class UserMessage(BaseModel):
     user_id:  str
     state:    str  = "IDLE"
     data:     dict = {}
-    history:  list = []   # Full conversation history for context
+    history:  list = []
 
 # ─────────────────────────────────────────────────────────────
 # MOCK DATABASE
@@ -151,215 +147,145 @@ def log_activity(data: dict, action: str):
     })
 
 # ─────────────────────────────────────────────────────────────
-# BUILD CRM CONTEXT SNAPSHOT
-# This tells Grok what has already happened in this session
+# CRM CONTEXT SNAPSHOT FOR AI
 # ─────────────────────────────────────────────────────────────
 def build_crm_context(data: dict, state: str) -> str:
-    score   = calc_lead_score(data)
-    plan    = data.get("plan", "not selected")
-    p_info  = PLANS.get(plan, None)
-    price   = f"₹{p_info['monthly']:,}/month" if p_info else "not discussed"
+    score  = calc_lead_score(data)
+    plan   = data.get("plan", "not selected")
+    p_info = PLANS.get(plan, None)
+    price  = f"₹{p_info['monthly']:,}/month" if p_info else "not discussed"
 
     ctx = f"""
-=== CURRENT CRM SESSION STATE ===
-Conversation State: {state}
+=== CURRENT SESSION STATE ===
 Lead Score: {score}/100 ({score_label(score)})
+Name: {data.get('name', 'NOT CAPTURED')}
+Email: {data.get('email', 'NOT CAPTURED')}
+Phone: {data.get('phone', 'NOT CAPTURED')}
+Company: {data.get('company', 'NOT CAPTURED')}
+Team Size: {data.get('team_size', 'NOT CAPTURED')}
+Plan Selected: {plan} ({price})
+Demo Booked: {'YES' if data.get('demo_booked') else 'NO'}
+Deal Created: {'YES' if data.get('deal_created') else 'NO'}
+Proposal Sent: {'YES' if data.get('proposal_sent') else 'NO'}
 
-Contact Info Captured:
-- Name: {data.get('name', 'NOT YET CAPTURED')}
-- Email: {data.get('email', 'NOT YET CAPTURED')}
-- Phone: {data.get('phone', 'NOT YET CAPTURED')}
-- Company: {data.get('company', 'NOT YET CAPTURED')}
-- Team Size: {data.get('team_size', 'NOT YET CAPTURED')}
-- Industry: {data.get('industry', 'NOT YET CAPTURED')}
-
-Deal Info:
-- Plan Selected: {plan}
-- Price: {price}
-- Demo Booked: {'YES' if data.get('demo_booked') else 'NO'}
-- Deal Created: {'YES' if data.get('deal_created') else 'NO'}
-- Proposal Sent: {'YES' if data.get('proposal_sent') else 'NO'}
-
-=== CRM DATABASE SNAPSHOT ===
-Total Leads in DB: {len(CRM_DB['leads'])}
-Total Deals in DB: {len(CRM_DB['deals'])}
-Total Tickets in DB: {len(CRM_DB['support_tickets'])}
+=== DATABASE ===
+Total Leads: {len(CRM_DB['leads'])}
+Total Deals: {len(CRM_DB['deals'])}
+Total Tickets: {len(CRM_DB['support_tickets'])}
 Pipeline Value: {fmt_inr(sum(d['value'] for d in CRM_DB['deals'])) if CRM_DB['deals'] else '₹0'}
 """
-
     if CRM_DB["leads"]:
         ctx += "\nRecent Leads:\n"
         for l in CRM_DB["leads"][-3:]:
-            ctx += f"  - {l['name']} | {l.get('email','—')} | Score: {l['lead_score']} | Stage: {l['stage']}\n"
+            ctx += f"  - {l['name']} | {l.get('email','—')} | Score:{l['lead_score']} | {l['stage']}\n"
 
     if CRM_DB["deals"]:
         ctx += "\nActive Deals:\n"
         for d in CRM_DB["deals"][-3:]:
-            ctx += f"  - {d['name']} ({d['company']}) | ₹{d['value']:,}/mo | Stage: {d['stage']}\n"
+            ctx += f"  - {d['name']} ({d['company']}) | ₹{d['value']:,}/mo | {d['stage']}\n"
 
     if CRM_DB["support_tickets"]:
-        ctx += "\nSupport Tickets:\n"
+        ctx += "\nTickets:\n"
         for t in CRM_DB["support_tickets"][-3:]:
-            ctx += f"  - {t['ticket']} | {t['name']} | Status: {t['status']} | Issue: {t['issue'][:50]}\n"
+            ctx += f"  - {t['ticket']} | {t['name']} | {t['status']} | {t['issue'][:50]}\n"
 
     return ctx
 
 # ─────────────────────────────────────────────────────────────
-# MASTER SYSTEM PROMPT FOR GROK
+# MASTER SYSTEM PROMPT
 # ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """
-You are an expert AI Sales Assistant for NexCRM — a complete Customer Relationship Management platform built for Indian businesses. You are highly intelligent, conversational, and persuasive like a professional B2B sales executive.
+You are an expert AI Sales Assistant for NexCRM — a complete CRM platform built for Indian businesses. You speak like a confident, friendly, professional B2B sales executive. You are helpful, persuasive, and intelligent.
 
-=== YOUR PERSONALITY ===
-- Friendly, confident, and professional — like a senior sales executive
-- Empathetic — you understand business challenges
-- Persuasive — you handle objections with data and logic
-- Smart — you remember context and give personalized responses
-- Natural — you never sound robotic or scripted
-
-=== NEXCRM PRODUCT KNOWLEDGE ===
-
-PRICING PLANS (Always use ₹ Indian Rupees):
+=== NEXCRM PRICING (Always use ₹ Indian Rupees) ===
 - Basic Plan: ₹8,000/month (₹76,800/year) — up to 5 users
-- Pro Plan: ₹20,000/month (₹1,92,000/year) — up to 20 users  
+- Pro Plan: ₹20,000/month (₹1,92,000/year) — up to 20 users
 - Enterprise Plan: ₹45,000/month (₹4,32,000/year) — unlimited users
-- All plans include 30-day free trial, no credit card required
+- All plans: 30-day free trial, no credit card required
 
-CORE MODULES:
-1. Lead Management — scoring, assignment, SLA tracking, stages (New→Qualified→Demo→Proposal→Closed)
-2. Contact Management — full profile, communication history, tagging
-3. Customer 360 View — complete timeline, all touchpoints, predictive insights
-4. Deal/Sales Pipeline — visual kanban, forecasting, probability scoring
-5. Dashboard & KPIs — real-time metrics, conversion rates, revenue tracking
+=== NEXCRM MODULES ===
+1. Lead Management — scoring (0-100), assignment, SLA, stages
+2. Contact Management — full profiles, history, tagging
+3. Customer 360 View — complete timeline, all touchpoints
+4. Deal/Sales Pipeline — New→Qualified→Demo→Proposal→Negotiation→Closed Won
+5. Dashboard & KPIs — real-time metrics, conversion rates
 6. Tasks & Calendar — appointments, reminders, auto-scheduling
-7. Communication Log — WhatsApp, Email, calls all in one place
-8. Automation & Workflows — trigger-based actions, drip campaigns
-9. Marketing Automation — email campaigns, lead nurturing sequences
+7. Communication Log — WhatsApp, Email, calls in one place
+8. Automation & Workflows — trigger-based sequences
+9. Marketing Automation — drip campaigns, nurturing
 10. Support Tickets — raise, track, escalate, resolve
-11. Reports & Analytics — revenue forecasts, team performance, pipeline health
+11. Reports & Analytics — forecasts, team performance
 
-AI FEATURES:
-- Predictive Lead Scoring (0-100 score based on behavior and profile)
-- AI Sales Assistant — next best action recommendations
-- Meeting Intelligence — call summaries, action items
-- Revenue Forecasting — ML-based pipeline predictions
+=== AI FEATURES ===
+- Predictive Lead Scoring (0-100 based on profile + behavior)
+- AI Sales Assistant (next best action)
+- Meeting Intelligence (call summaries)
+- Revenue Forecasting (ML-based)
 
-LEAD SCORING LOGIC:
-- Base score: 40
-- Name captured: +10
-- Email captured: +15
-- Phone captured: +8
-- Company captured: +10
-- Team size (small +5, medium +10, large +17)
-- Enterprise plan: +10, Pro plan: +6
-- Demo booked: +8
-- Deal created: +5
-- Max: 100
+=== LEAD SCORE LOGIC ===
+Base 40 + Name(+10) + Email(+15) + Phone(+8) + Company(+10) + TeamSize(+5/10/17) + Plan Enterprise(+10)/Pro(+6) + Demo booked(+8) + Deal created(+5) = max 100
 
-HOW THE PIPELINE WORKS:
-Stage 1 (New): Lead just created from initial contact
-Stage 2 (Qualified): Lead has shared contact details and shown intent
-Stage 3 (Demo): Demo has been scheduled or completed
-Stage 4 (Proposal): Quote/proposal has been sent
-Stage 5 (Negotiation): Discussion on pricing/terms
-Stage 6 (Closed Won): Deal signed and payment received
-Stage 7 (Closed Lost): Deal not converted
+=== PIPELINE STAGES ===
+New → Qualified → Demo → Proposal → Negotiation → Closed Won / Closed Lost
 
-COMPETITORS COMPARISON:
-vs Salesforce: 60% cheaper, same enterprise features, Indian support
-vs HubSpot: No per-user pricing, unlimited contacts, better for SMBs
-vs Zoho: Better AI features, cleaner UI, faster onboarding
-vs Freshsales: Better pipeline visualization, stronger automation
+=== COMPETITORS ===
+vs Salesforce: 60% cheaper, same features, Indian support
+vs HubSpot: No per-user pricing, unlimited contacts
+vs Zoho: Better AI, cleaner UI, faster onboarding
+vs Freshsales: Better pipeline, stronger automation
 
-=== CRM ACTION TRIGGERS ===
-When the user's message warrants it, you MUST include these exact action tags in your response.
-These tags are parsed silently and execute CRM actions in the background:
+=== CRM ACTION TAGS ===
+When appropriate, include these tags at the END of your response on a new line.
+They are NEVER shown to the user — they execute silent CRM actions:
 
-[ACTION:CREATE_LEAD] — When user shares their name AND email
-[ACTION:CREATE_DEAL:plan_name] — When user wants to buy/create deal (e.g. [ACTION:CREATE_DEAL:enterprise])
-[ACTION:BOOK_DEMO] — When user confirms they want to book a demo
-[ACTION:SEND_PROPOSAL] — When user requests a proposal
-[ACTION:CREATE_TICKET:issue description] — When user reports a bug/issue
-[ACTION:LOG_WHATSAPP] — When user asks to send details on WhatsApp
-[ACTION:LOG_AUTOMATION] — When user asks to trigger automation
+[ACTION:CREATE_LEAD] — when user shares name + email
+[ACTION:CREATE_DEAL:plan_name] — when user wants a deal (e.g. [ACTION:CREATE_DEAL:enterprise])
+[ACTION:BOOK_DEMO] — when user confirms demo
+[ACTION:SEND_PROPOSAL] — when user requests proposal
+[ACTION:CREATE_TICKET:issue text] — when user reports a bug/issue
+[ACTION:LOG_WHATSAPP] — when user asks for WhatsApp details
+[ACTION:LOG_AUTOMATION] — when user triggers automation
 
-IMPORTANT: Place action tags at the END of your response, on their own line.
-The user will NEVER see these tags — they are stripped before displaying.
-
-=== CONVERSATION RULES ===
-
-1. ALWAYS respond in a natural, conversational way — never bullet-point dump
-2. ALWAYS use ₹ Indian Rupees for all prices
-3. When a prospect gives pricing query with plan + team size → CREATE_LEAD + CREATE_DEAL silently
-4. When capturing contact info → UPDATE context and CREATE_LEAD when you have name + email
-5. Never say "I am an AI" — you are the NexCRM Sales Assistant
-6. Handle ANY question about CRM, sales, business, pricing naturally
-7. For completely off-topic questions (cricket, weather etc) — politely redirect to NexCRM
-8. Always end with a clear next step or question to keep conversation going
-9. Keep responses concise but complete — max 150 words unless explaining a complex topic
-10. Use emojis sparingly — only where they genuinely add warmth
+=== RULES ===
+1. Always respond naturally like a sales executive — never robotic
+2. Always use ₹ Indian Rupees
+3. Keep responses under 150 words unless explaining something complex
+4. Never say "I am an AI" — you are the NexCRM Sales Assistant
+5. For off-topic questions (cricket, weather etc) — politely redirect to NexCRM
+6. Always end with a clear next step to keep conversation going
+7. Handle ANY question intelligently — pricing, features, objections, comparisons, CRM concepts
+8. Use **bold** for key numbers and names, `backticks` for IDs
 
 === OBJECTION HANDLING ===
-Budget objection → ROI data, payment flexibility, free trial, start small with Basic
-Competition → Feature comparison, price advantage, Indian support, native WhatsApp
-Timing → Lock in pricing, reminder offer, proposal now decide later
-Not sure → Case studies, free trial, 30-min demo with no commitment
+Budget → ROI data, annual savings, start with Basic, free trial
+Competition → Feature table, price advantage, Indian support, WhatsApp native
+Timing → Lock in pricing, proposal now, reminder offer
+Unsure → Free trial, 30-min demo, no commitment needed
 
-=== DEMO SCRIPT (For Reference) ===
-Step 1: Greet → offer pricing or demo
-Step 2: Pricing inquiry → show plan + silently create lead + deal
-Step 3: Contact capture → update lead + show score
-Step 4: Book demo → confirm slot, Meet link, calendar invite
-Step 5: Create deal → show deal ID, value, stage, probability
-Step 6: Show pipeline → visual stages + deals
-Step 7: 360 view → complete customer profile
-Step 8: Reports → KPIs, forecast, conversion
-Step 9: Lead score → Hot/Warm/Cold label
-
-=== RESPONSE FORMAT ===
-- Respond naturally like a sales executive
-- For structured data (tables, pipeline) use markdown formatting
-- Bold key numbers and names with **double asterisks**
-- Use backticks for IDs: `lead_784`
-- Always include action tags at the bottom when applicable
+=== DEMO SCRIPT STEPS (follow this flow) ===
+1. Greet → offer pricing or demo
+2. Pricing query → show plan details → silently CREATE_LEAD + CREATE_DEAL
+3. Contact capture → update score → link to company
+4. Book demo → confirm slot + Meet link + invite
+5. Create deal → show ID, value, stage, probability
+6. Show pipeline → stages + deals + total value
+7. 360 view → full customer profile
+8. Reports → KPIs, forecast, conversion rate
+9. Lead score → Hot/Warm/Cold + sales team notified
 """
 
 # ─────────────────────────────────────────────────────────────
-# EXTRACT AND EXECUTE ACTIONS FROM GROK RESPONSE
+# PROCESS ACTION TAGS FROM AI RESPONSE
 # ─────────────────────────────────────────────────────────────
-def extract_entities_from_text(text: str, data: dict) -> dict:
-    """Extract name, email, phone, company from Grok's response context"""
-    email_m = EMAIL_RE.search(text)
-    phone_m = PHONE_RE.search(text)
-    if email_m and not data.get("email"):
-        data["email"] = email_m.group()
-    if phone_m and not data.get("phone"):
-        data["phone"] = phone_m.group()
-    return data
-
-def extract_plan_from_text(text: str) -> str:
-    low = text.lower()
-    if "enterprise" in low: return "enterprise"
-    if "pro"        in low: return "pro"
-    if "basic"      in low: return "basic"
-    return "pro"
-
-def process_actions(response_text: str, data: dict, user_message: str) -> tuple[str, dict, str]:
-    """
-    Parse [ACTION:...] tags from Grok response.
-    Execute CRM operations silently.
-    Return cleaned response text, updated data, updated state.
-    """
-    state = "IDLE"
+def process_actions(response_text: str, data: dict, user_message: str) -> tuple:
     crm_confirmations = []
 
-    # Extract email/phone from user message too
+    # Extract entities from user message
     email_m = EMAIL_RE.search(user_message)
     phone_m = PHONE_RE.search(user_message)
     if email_m: data["email"] = email_m.group()
     if phone_m: data["phone"] = phone_m.group()
 
-    # Parse name from "my name is X" or "I am X"
     name_match = re.search(
         r"(?:my name is|i am|i'm|this is)\s+([A-Z][a-z]+(?: [A-Z][a-z]+)?)",
         user_message, re.IGNORECASE
@@ -367,9 +293,8 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
     if name_match and not data.get("name"):
         data["name"] = name_match.group(1).strip()
 
-    # Parse company from "company is X" or "from X"
     co_match = re.search(
-        r"(?:company is|from|at|working at)\s+([A-Z][a-zA-Z\s]+?)(?:\s*,|\s*\.|$)",
+        r"(?:company is|from|at|working at)\s+([A-Za-z][a-zA-Z\s]+?)(?:\s*,|\s*\.|$)",
         user_message, re.IGNORECASE
     )
     if co_match and not data.get("company"):
@@ -377,45 +302,50 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
         if len(candidate.split()) <= 4:
             data["company"] = candidate
 
-    # Parse team size
-    ts_match = re.search(r"(\d+)\s*(?:users?|people|members?|team members?|employees?)", user_message, re.IGNORECASE)
+    ts_match = re.search(
+        r"(\d+)\s*(?:users?|people|members?|team members?|employees?)",
+        user_message, re.IGNORECASE
+    )
     if ts_match and not data.get("team_size"):
         data["team_size"] = ts_match.group(1)
 
-    # Parse plan from user message
     if not data.get("plan"):
-        plan = extract_plan_from_text(user_message)
-        if any(p in user_message.lower() for p in ["enterprise", "pro", "basic"]):
-            data["plan"] = plan
+        low = user_message.lower()
+        if "enterprise" in low: data["plan"] = "enterprise"
+        elif "pro"       in low: data["plan"] = "pro"
+        elif "basic"     in low: data["plan"] = "basic"
 
-    # Process action tags from Grok response
+    # Parse and execute action tags
     action_pattern = re.compile(r'\[ACTION:([^\]]+)\]', re.IGNORECASE)
     actions = action_pattern.findall(response_text)
 
     for action in actions:
         action_upper = action.upper().strip()
 
-        if action_upper == "CREATE_LEAD" and data.get("name") and data.get("email"):
-            # Don't create duplicate leads
-            existing = any(l.get("email") == data["email"] for l in CRM_DB["leads"])
-            if not existing:
-                lid = save_lead(data)
-                score = calc_lead_score(data)
-                data["lead_id"] = lid
-                crm_confirmations.append(
-                    f"✅ Lead created successfully *(ID: `{lid}`)*\n"
-                    f"✅ Lead linked to **{data.get('company', 'your company')}**\n"
-                    f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
-                )
+        if action_upper == "CREATE_LEAD":
+            if data.get("name") and data.get("email"):
+                existing = any(l.get("email") == data["email"] for l in CRM_DB["leads"])
+                if not existing:
+                    lid   = save_lead(data)
+                    score = calc_lead_score(data)
+                    data["lead_id"] = lid
+                    crm_confirmations.append(
+                        f"✅ Lead created successfully *(ID: `{lid}`)*\n"
+                        f"✅ Lead linked to **{data.get('company', 'your company')}**\n"
+                        f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
+                    )
 
         elif action_upper.startswith("CREATE_DEAL"):
             parts = action.split(":", 1)
             plan  = parts[1].lower().strip() if len(parts) > 1 else data.get("plan", "pro")
-            plan  = plan if plan in PLANS else extract_plan_from_text(plan)
+            if plan not in PLANS:
+                if "enterprise" in plan: plan = "enterprise"
+                elif "pro"      in plan: plan = "pro"
+                else:                    plan = "basic"
             data["plan"] = plan
-            p     = PLANS.get(plan, PLANS["pro"])
+            p     = PLANS[plan]
             did   = save_deal(data, p["monthly"])
-            data["deal_id"] = did
+            data["deal_id"]      = did
             data["deal_created"] = True
             score = calc_lead_score(data)
             crm_confirmations.append(
@@ -428,15 +358,14 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
         elif action_upper == "BOOK_DEMO":
             apt  = book_apt(data)
             data["demo_booked"] = True
-            data["apt_id"] = apt["id"]
-            score = calc_lead_score(data)
             log_comm(data, "System", f"Demo booked: {apt['date']}")
+            score = calc_lead_score(data)
             crm_confirmations.append(
                 f"✅ Task created: Demo with **{data.get('name', 'you')}**\n"
                 f"✅ Appointment: **{apt['date']} at {apt['time']}**\n"
                 f"✅ Google Meet: `{apt['meet']}`\n"
                 f"✅ Calendar invite sent to **{data.get('email', 'your email')}**\n"
-                f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
+                f"🎯 Lead Score updated: **{score}/100** — {score_label(score)}"
             )
 
         elif action_upper == "SEND_PROPOSAL":
@@ -444,7 +373,6 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
             p    = PLANS.get(plan, PLANS["pro"])
             log_comm(data, "Email", "Proposal sent")
             data["proposal_sent"] = True
-            log_activity(data, "Proposal emailed")
             crm_confirmations.append(
                 f"✅ Proposal emailed to **{data.get('email', 'you')}**\n"
                 f"📄 Plan: **{p['label']}** — ₹{p['monthly']:,}/month"
@@ -465,7 +393,7 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
             log_comm(data, "WhatsApp", "Details sent via WhatsApp")
             crm_confirmations.append(
                 f"📱 Details sent on WhatsApp!\n"
-                f"✅ Message delivered to your registered number"
+                f"✅ Plan: **{p['label']}** — ₹{p['monthly']:,}/month"
             )
 
         elif action_upper == "LOG_AUTOMATION":
@@ -475,17 +403,18 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple[
                 f"⚡ Automation triggered!\n"
                 f"✅ Lead nurture sequence started\n"
                 f"✅ Follow-up email scheduled for tomorrow 10:00 AM\n"
-                f"✅ Sales manager notified via Slack"
+                f"✅ Sales manager notified via Slack\n"
+                f"✅ Task created: Follow-up call within 24 hours"
             )
 
-    # Remove action tags from visible response
+    # Strip action tags from visible response
     clean_response = action_pattern.sub("", response_text).strip()
 
-    # Append CRM confirmations to response
+    # Append CRM confirmations
     if crm_confirmations:
         clean_response += "\n\n" + "\n\n".join(crm_confirmations)
 
-    return clean_response, data, state
+    return clean_response, data
 
 # ─────────────────────────────────────────────────────────────
 # MAIN ENDPOINT
@@ -495,9 +424,9 @@ async def chat(msg: UserMessage):
     raw     = msg.message.strip()
     state   = msg.state
     data    = dict(msg.data)
-    history = list(msg.history)  # Full conversation history
+    history = list(msg.history)
 
-    # ── Ticket lookup (handle directly, no need for Grok) ────
+    # Direct ticket lookup — no AI needed
     ticket_match = TICKET_RE.search(raw)
     if ticket_match:
         tid   = ticket_match.group().upper()
@@ -515,11 +444,10 @@ async def chat(msg: UserMessage):
                 "state": "IDLE", "data": data
             }
 
-    # ── Build CRM context snapshot ────────────────────────────
+    # Build CRM context
     crm_context = build_crm_context(data, state)
 
-    # ── Build messages array for Grok ────────────────────────
-    # System prompt + CRM context
+    # Build messages for GroqCloud
     messages = [
         {
             "role": "system",
@@ -527,42 +455,42 @@ async def chat(msg: UserMessage):
         }
     ]
 
-    # Add conversation history (last 10 turns to stay within context)
+    # Add last 10 turns of history
     for turn in history[-10:]:
         if turn.get("role") and turn.get("content"):
             messages.append({"role": turn["role"], "content": turn["content"]})
 
-    # Add current user message
+    # Add current message
     messages.append({"role": "user", "content": raw})
 
-    # ── Call Grok API ─────────────────────────────────────────
+    # Call GroqCloud API
     try:
-        completion = grok_client.chat.completions.create(
-            model="grok-3-mini",          # Fast and smart, use grok-3 for max intelligence
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",   # Best model on GroqCloud — fast + smart
             messages=messages,
             max_tokens=600,
-            temperature=0.7,              # Balanced: creative but accurate
+            temperature=0.7,
         )
-        grok_response = completion.choices[0].message.content.strip()
+        ai_response = completion.choices[0].message.content.strip()
+
     except Exception as e:
-        print(f"Grok API error: {e}")
-        grok_response = (
-            "I'm having a brief connectivity issue. Let me help you directly:\n\n"
+        print(f"Groq API error: {e}")
+        ai_response = (
+            "I'm having a brief connectivity issue. Here's a quick summary:\n\n"
             "• **Pricing**: Basic ₹8,000 | Pro ₹20,000 | Enterprise ₹45,000/month\n"
-            "• **Demo**: Just say 'book a demo' and I'll set it up\n"
+            "• **Demo**: Say 'book a demo' and I'll set it up\n"
             "• **Support**: Describe your issue and I'll raise a ticket\n\n"
             "Please try again in a moment!"
         )
 
-    # ── Process CRM actions silently ─────────────────────────
-    clean_response, updated_data, new_state = process_actions(grok_response, data, raw)
+    # Process CRM actions silently
+    clean_response, updated_data = process_actions(ai_response, data, raw)
 
     return {
         "response": clean_response,
-        "state":    new_state,
+        "state":    "IDLE",
         "data":     updated_data,
     }
-
 
 # ─────────────────────────────────────────────────────────────
 # ADMIN API
