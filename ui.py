@@ -17,6 +17,30 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "YOUR_GROQ_API_KEY")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+COMPANY_NAME = "Future Invo Solutions"
+COMPANY_URL = "https://futureinvo.com/"
+ASSISTANT_NAME = "Future Invo CRM Assistant"
+
+CRM_KEYWORDS = {
+    "crm", "lead", "leads", "customer", "customers", "contact", "contacts",
+    "deal", "deals", "pipeline", "sales", "support", "ticket", "tickets",
+    "pricing", "price", "demo", "feature", "features", "automation",
+    "workflow", "workflows", "dashboard", "report", "reports", "analytics",
+    "integration", "integrations", "followup", "follow-up", "task", "tasks",
+    "calendar", "whatsapp", "email", "login", "password", "bug", "issue",
+    "error", "onboarding", "trial", "proposal", "invoice", "invoicing",
+}
+
+COMPETITOR_KEYWORDS = {
+    "salesforce", "hubspot", "zoho", "freshsales", "pipedrive", "monday",
+    "monday.com", "odoo", "microsoft dynamics", "dynamics 365",
+}
+
+FOLLOW_UP_HINTS = (
+    "name", "email", "phone", "company", "team", "issue", "problem",
+    "demo", "ticket", "contact", "pricing", "requirement",
+)
+
 # ─────────────────────────────────────────────────────────────
 # REQUEST SCHEMA
 # ─────────────────────────────────────────────────────────────
@@ -57,6 +81,77 @@ EMAIL_RE  = re.compile(r"[\w\.-]+@[\w\.-]+\.\w+")
 PHONE_RE  = re.compile(r"[\+]?[\d][\d\s\-]{8,13}\d")
 TICKET_RE = re.compile(r"TICK-\d+", re.IGNORECASE)
 NUM_RE    = re.compile(r"\b(\d+)\b")
+
+
+def normalize_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def is_greeting_only(text: str) -> bool:
+    normalized = normalize_text(text)
+    return normalized in {
+        "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+        "start", "start over", "reset", "restart", "help",
+    }
+
+
+def looks_like_follow_up(text: str, history: list, data: dict) -> bool:
+    stripped = text.strip()
+    lowered = normalize_text(text)
+    if EMAIL_RE.search(stripped) or PHONE_RE.search(stripped) or TICKET_RE.search(stripped):
+        return True
+    if data:
+        return True
+    if len(lowered.split()) <= 5 and history:
+        last_assistant = next(
+            (turn.get("content", "") for turn in reversed(history) if turn.get("role") == "assistant"),
+            "",
+        ).lower()
+        if any(hint in last_assistant for hint in FOLLOW_UP_HINTS):
+            return True
+    return False
+
+
+def is_competitor_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    if any(keyword in lowered for keyword in COMPETITOR_KEYWORDS):
+        return True
+    comparison_patterns = (
+        "better than you", "better than your crm", "other crm", "another crm",
+        "best crm", "compare crm", "compare with", "alternative to",
+    )
+    return any(pattern in lowered for pattern in comparison_patterns)
+
+
+def is_crm_question(text: str, history: list, data: dict) -> bool:
+    lowered = normalize_text(text)
+    if is_greeting_only(lowered) or looks_like_follow_up(text, history, data):
+        return True
+    if any(keyword in lowered for keyword in CRM_KEYWORDS):
+        return True
+    crm_patterns = (
+        "book a demo", "raise a ticket", "check ticket", "talk to sales",
+        "talk to support", "customer relationship", "sales pipeline",
+    )
+    return any(pattern in lowered for pattern in crm_patterns)
+
+
+def scope_redirect_response() -> str:
+    return (
+        f"I am here only for {COMPANY_NAME}'s CRM assistance. "
+        "I can help with CRM features, demos, pricing requests, lead capture, "
+        "support tickets, and CRM-related workflows. "
+        "Please ask me something related to your CRM needs."
+    )
+
+
+def competitor_redirect_response() -> str:
+    return (
+        f"I can only discuss {COMPANY_NAME}'s CRM services and support. "
+        "I do not compare or recommend other CRM products. "
+        f"If you would like, I can help with {COMPANY_NAME}'s CRM features, "
+        "demo requests, onboarding, or support."
+    )
 
 # ─────────────────────────────────────────────────────────────
 # DB HELPERS
@@ -194,84 +289,45 @@ Pipeline Value: {fmt_inr(sum(d['value'] for d in CRM_DB['deals'])) if CRM_DB['de
 # ─────────────────────────────────────────────────────────────
 # MASTER SYSTEM PROMPT
 # ─────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """
-You are an expert AI Sales Assistant for NexCRM — a complete CRM platform built for Indian businesses. You speak like a confident, friendly, professional B2B sales executive. You are helpful, persuasive, and intelligent.
+SYSTEM_PROMPT = f"""
+You are the official CRM assistant for {COMPANY_NAME} ({COMPANY_URL}).
+Your role is to speak professionally, briefly, and only about {COMPANY_NAME}'s CRM-related services.
 
-=== NEXCRM PRICING (Always use ₹ Indian Rupees) ===
-- Basic Plan: ₹8,000/month (₹76,800/year) — up to 5 users
-- Pro Plan: ₹20,000/month (₹1,92,000/year) — up to 20 users
-- Enterprise Plan: ₹45,000/month (₹4,32,000/year) — unlimited users
-- All plans: 30-day free trial, no credit card required
+=== SCOPE RULES ===
+1. Answer only CRM-related questions for {COMPANY_NAME}.
+2. Never answer general knowledge, politics, history, sports, entertainment, or unrelated factual questions.
+3. Never compare, rank, promote, or recommend competitors or other CRM tools.
+4. If the user asks an off-topic or competitor question, politely redirect them back to {COMPANY_NAME}'s CRM.
+5. Do not invent company facts that were not provided in the prompt or session context.
+6. If pricing or feature details are not certain, invite the user to request a demo or contact sales.
+7. Keep responses under 120 words unless a support explanation needs more detail.
+8. Use a professional tone and always offer a relevant next step.
 
-=== NEXCRM MODULES ===
-1. Lead Management — scoring (0-100), assignment, SLA, stages
-2. Contact Management — full profiles, history, tagging
-3. Customer 360 View — complete timeline, all touchpoints
-4. Deal/Sales Pipeline — New→Qualified→Demo→Proposal→Negotiation→Closed Won
-5. Dashboard & KPIs — real-time metrics, conversion rates
-6. Tasks & Calendar — appointments, reminders, auto-scheduling
-7. Communication Log — WhatsApp, Email, calls in one place
-8. Automation & Workflows — trigger-based sequences
-9. Marketing Automation — drip campaigns, nurturing
-10. Support Tickets — raise, track, escalate, resolve
-11. Reports & Analytics — forecasts, team performance
-
-=== AI FEATURES ===
-- Predictive Lead Scoring (0-100 based on profile + behavior)
-- AI Sales Assistant (next best action)
-- Meeting Intelligence (call summaries)
-- Revenue Forecasting (ML-based)
-
-=== LEAD SCORE LOGIC ===
-Base 40 + Name(+10) + Email(+15) + Phone(+8) + Company(+10) + TeamSize(+5/10/17) + Plan Enterprise(+10)/Pro(+6) + Demo booked(+8) + Deal created(+5) = max 100
-
-=== PIPELINE STAGES ===
-New → Qualified → Demo → Proposal → Negotiation → Closed Won / Closed Lost
-
-=== COMPETITORS ===
-vs Salesforce: 60% cheaper, same features, Indian support
-vs HubSpot: No per-user pricing, unlimited contacts
-vs Zoho: Better AI, cleaner UI, faster onboarding
-vs Freshsales: Better pipeline, stronger automation
+=== ALLOWED TOPICS ===
+- CRM features and workflows
+- Lead capture and follow-up
+- Sales pipeline and deal management
+- Support tickets and issue reporting
+- Demo requests and onboarding help
+- CRM reporting, automation, and integrations
 
 === CRM ACTION TAGS ===
 When appropriate, include these tags at the END of your response on a new line.
-They are NEVER shown to the user — they execute silent CRM actions:
+They are never shown to the user and execute silent CRM actions:
 
-[ACTION:CREATE_LEAD] — when user shares name + email
-[ACTION:CREATE_DEAL:plan_name] — when user wants a deal (e.g. [ACTION:CREATE_DEAL:enterprise])
-[ACTION:BOOK_DEMO] — when user confirms demo
-[ACTION:SEND_PROPOSAL] — when user requests proposal
-[ACTION:CREATE_TICKET:issue text] — when user reports a bug/issue
-[ACTION:LOG_WHATSAPP] — when user asks for WhatsApp details
-[ACTION:LOG_AUTOMATION] — when user triggers automation
+[ACTION:CREATE_LEAD]
+[ACTION:CREATE_DEAL:plan_name]
+[ACTION:BOOK_DEMO]
+[ACTION:SEND_PROPOSAL]
+[ACTION:CREATE_TICKET:issue text]
+[ACTION:LOG_WHATSAPP]
+[ACTION:LOG_AUTOMATION]
 
-=== RULES ===
-1. Always respond naturally like a sales executive — never robotic
-2. Always use ₹ Indian Rupees
-3. Keep responses under 150 words unless explaining something complex
-4. Never say "I am an AI" — you are the NexCRM Sales Assistant
-5. For off-topic questions (cricket, weather etc) — politely redirect to NexCRM
-6. Always end with a clear next step to keep conversation going
-7. Handle ANY question intelligently — pricing, features, objections, comparisons, CRM concepts
-8. Use **bold** for key numbers and names, `backticks` for IDs
-
-=== OBJECTION HANDLING ===
-Budget → ROI data, annual savings, start with Basic, free trial
-Competition → Feature table, price advantage, Indian support, WhatsApp native
-Timing → Lock in pricing, proposal now, reminder offer
-Unsure → Free trial, 30-min demo, no commitment needed
-
-=== DEMO SCRIPT STEPS (follow this flow) ===
-1. Greet → offer pricing or demo
-2. Pricing query → show plan details → silently CREATE_LEAD + CREATE_DEAL
-3. Contact capture → update score → link to company
-4. Book demo → confirm slot + Meet link + invite
-5. Create deal → show ID, value, stage, probability
-6. Show pipeline → stages + deals + total value
-7. 360 view → full customer profile
-8. Reports → KPIs, forecast, conversion rate
-9. Lead score → Hot/Warm/Cold + sales team notified
+=== RESPONSE STYLE ===
+- Refer to the business as {COMPANY_NAME}
+- Stay specific to CRM assistance
+- Prefer clear, direct wording over marketing hype
+- Use **bold** for important labels and `backticks` for IDs
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -426,6 +482,20 @@ async def chat(msg: UserMessage):
     data    = dict(msg.data)
     history = list(msg.history)
 
+    if is_competitor_query(raw):
+        return {
+            "response": competitor_redirect_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if not is_crm_question(raw, history, data):
+        return {
+            "response": scope_redirect_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
     # Direct ticket lookup — no AI needed
     ticket_match = TICKET_RE.search(raw)
     if ticket_match:
@@ -476,11 +546,9 @@ async def chat(msg: UserMessage):
     except Exception as e:
         print(f"Groq API error: {e}")
         ai_response = (
-            "I'm having a brief connectivity issue. Here's a quick summary:\n\n"
-            "• **Pricing**: Basic ₹8,000 | Pro ₹20,000 | Enterprise ₹45,000/month\n"
-            "• **Demo**: Say 'book a demo' and I'll set it up\n"
-            "• **Support**: Describe your issue and I'll raise a ticket\n\n"
-            "Please try again in a moment!"
+            f"I am having a brief connectivity issue with {COMPANY_NAME}'s CRM assistant service.\n\n"
+            "I can still help with CRM demos, support tickets, lead capture, and feature-related questions.\n"
+            "Please try your CRM question again in a moment."
         )
 
     # Process CRM actions silently
