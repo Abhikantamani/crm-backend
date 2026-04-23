@@ -11,13 +11,25 @@ function generateSessionId() {
 const PricingCard = () => (
   <div className="mt-3 w-full max-w-sm overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-lg">
     <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5">
-      <p className="text-xs font-bold uppercase tracking-widest text-white">Product Overview</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-white">Pricing Plans</p>
     </div>
-    <div className="px-4 py-3 text-sm text-slate-700">
-      For product details, a walkthrough, or a custom quote, ask for a demo and our team will assist you.
+    <div className="divide-y divide-slate-100">
+      {[
+        { label: 'Basic', price: '₹8,000', note: '/month · up to 5 users' },
+        { label: 'Pro', price: '₹20,000', note: '/month · up to 20 users' },
+        { label: 'Enterprise', price: '₹45,000', note: '/month · unlimited users' },
+      ].map(({ label, price, note }) => (
+        <div key={label} className="flex items-center justify-between px-4 py-3">
+          <span className="text-sm font-medium text-slate-700">{label}</span>
+          <div className="text-right">
+            <span className="text-sm font-bold text-slate-900">{price}</span>
+            <span className="block text-xs text-slate-400">{note}</span>
+          </div>
+        </div>
+      ))}
     </div>
     <div className="bg-slate-50 px-4 py-2 text-center text-xs text-slate-400">
-      Demos, onboarding help, and support guidance are available here
+      All plans include a 30-day free trial
     </div>
   </div>
 );
@@ -108,6 +120,7 @@ function MessageBubble({ msg }) {
 }
 
 const CHIPS = [
+  'What are your pricing plans?',
   'Show your features',
   'I want a demo',
   'Create a support ticket',
@@ -121,7 +134,7 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef = useRef('');
 
-  const WELCOME = 'Hello! I am your CRM bot from Future Invo Solutions.';
+  const WELCOME = 'Hello! I am your CRM bot from Future Invo Solutions.\n\nI can help with pricing, features, demos, lead handling, pipeline tracking, support tickets, and onboarding.';
 
   const [messages, setMessages] = useState([{ sender: 'bot', text: WELCOME }]);
   const [input, setInput] = useState('');

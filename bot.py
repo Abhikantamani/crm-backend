@@ -36,6 +36,7 @@ def welcome_response() -> dict:
     return {
         "response": (
             "Hello! I am your CRM bot from Future Invo Solutions.\n\n"
+            "I can help with pricing, features, demos, lead handling, support tickets, and onboarding.\n\n"
             "You can ask me about:\n"
             "- **Pricing, features, and demos**\n"
             "- **Technical issues and login help**\n"
@@ -82,6 +83,30 @@ async def chat_endpoint(payload: ChatMessage):
                 "Our CRM is the best choice if you want a practical system with strong features, "
                 "smooth lead handling, and dependable support. "
                 "If you want, I can walk you through what makes it stand out."
+            )
+        }
+
+    if current_state is None and any(word in msg for word in ["price", "pricing", "cost", "plans"]):
+        return {
+            "response": (
+                "**Pricing Plans**\n"
+                "- **Basic**: ₹8,000/month for up to 5 users\n"
+                "- **Pro**: ₹20,000/month for up to 20 users\n"
+                "- **Enterprise**: ₹45,000/month for unlimited users\n\n"
+                "All plans include a 30-day free trial."
+            )
+        }
+
+    if current_state is None and any(word in msg for word in ["feature", "features", "pipeline", "360"]):
+        return {
+            "response": (
+                "**Key Features**\n"
+                "- Lead management and scoring\n"
+                "- Customer 360 view\n"
+                "- Sales pipeline tracking\n"
+                "- Tasks and calendar\n"
+                "- Support tickets\n"
+                "- Reports and automation"
             )
         }
 

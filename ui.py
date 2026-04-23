@@ -151,6 +151,51 @@ def competitor_redirect_response() -> str:
         "If you want, I can show you what makes us stand out."
     )
 
+
+def is_pricing_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    pricing_terms = ("pricing", "price", "prices", "plans", "cost", "quote", "package", "packages")
+    return any(term in lowered for term in pricing_terms)
+
+
+def is_feature_query(text: str) -> bool:
+    lowered = normalize_text(text)
+    feature_terms = ("features", "feature", "modules", "capabilities", "360 view", "pipeline")
+    return any(term in lowered for term in feature_terms)
+
+
+def is_explicit_demo_request(text: str) -> bool:
+    lowered = normalize_text(text)
+    demo_terms = (
+        "book a demo", "schedule a demo", "i want a demo", "need a demo",
+        "arrange a demo", "demo please", "book demo", "schedule demo",
+    )
+    return any(term in lowered for term in demo_terms)
+
+
+def pricing_response() -> str:
+    return (
+        "**Pricing Plans**\n"
+        f"- **Basic**: {fmt_inr(PLANS['basic']['monthly'])}/month for up to {PLANS['basic']['users']} users\n"
+        f"- **Pro**: {fmt_inr(PLANS['pro']['monthly'])}/month for up to {PLANS['pro']['users']} users\n"
+        f"- **Enterprise**: {fmt_inr(PLANS['enterprise']['monthly'])}/month for unlimited users\n\n"
+        "All plans include a 30-day free trial. If you want, I can also help you choose the right plan."
+    )
+
+
+def features_response() -> str:
+    return (
+        "**Key Features**\n"
+        "- Lead management with scoring and follow-up tracking\n"
+        "- Customer 360 view with profiles and history\n"
+        "- Sales pipeline for deals from new to closed\n"
+        "- Tasks, calendar, and demo scheduling\n"
+        "- Communication log for calls, email, and WhatsApp\n"
+        "- Support ticket handling and status tracking\n"
+        "- Reports, analytics, and workflow automation\n\n"
+        "If you want, I can explain any feature in more detail."
+    )
+
 # ─────────────────────────────────────────────────────────────
 # DB HELPERS
 # ─────────────────────────────────────────────────────────────
@@ -309,6 +354,22 @@ Your role is to speak professionally, briefly, and only about {COMPANY_NAME}'s C
 - Demo requests and onboarding help
 - CRM reporting, automation, and integrations
 
+=== PRICING ===
+- Basic Plan: ₹8,000/month for up to 5 users
+- Pro Plan: ₹20,000/month for up to 20 users
+- Enterprise Plan: ₹45,000/month for unlimited users
+- All plans include a 30-day free trial
+
+=== PRODUCT FEATURES ===
+- Lead management and scoring
+- Contact records and customer 360 view
+- Deal pipeline and sales stages
+- Tasks, calendar, and appointments
+- Communication logs
+- Support tickets
+- Reports and analytics
+- Workflow automation
+
 === CRM ACTION TAGS ===
 When appropriate, include these tags at the END of your response on a new line.
 They are never shown to the user and execute silent CRM actions:
@@ -327,6 +388,8 @@ They are never shown to the user and execute silent CRM actions:
 - Prefer clear, direct wording over marketing hype
 - Use **bold** for important labels and `backticks` for IDs
 - Do not repeat the company name unless it adds clear value
+- Give exact pricing when the user asks for pricing
+- Do not use [ACTION:BOOK_DEMO] unless the user clearly asks to book or schedule a demo
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -411,17 +474,18 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple:
             )
 
         elif action_upper == "BOOK_DEMO":
-            apt  = book_apt(data)
-            data["demo_booked"] = True
-            log_comm(data, "System", f"Demo booked: {apt['date']}")
-            score = calc_lead_score(data)
-            crm_confirmations.append(
-                f"✅ Task created: Demo with **{data.get('name', 'you')}**\n"
-                f"✅ Appointment: **{apt['date']} at {apt['time']}**\n"
-                f"✅ Google Meet: `{apt['meet']}`\n"
-                f"✅ Calendar invite sent to **{data.get('email', 'your email')}**\n"
-                f"🎯 Lead Score updated: **{score}/100** — {score_label(score)}"
-            )
+            if is_explicit_demo_request(user_message):
+                apt  = book_apt(data)
+                data["demo_booked"] = True
+                log_comm(data, "System", f"Demo booked: {apt['date']}")
+                score = calc_lead_score(data)
+                crm_confirmations.append(
+                    f"✅ Task created: Demo with **{data.get('name', 'you')}**\n"
+                    f"✅ Appointment: **{apt['date']} at {apt['time']}**\n"
+                    f"✅ Google Meet: `{apt['meet']}`\n"
+                    f"✅ Calendar invite sent to **{data.get('email', 'your email')}**\n"
+                    f"🎯 Lead Score updated: **{score}/100** — {score_label(score)}"
+                )
 
         elif action_upper == "SEND_PROPOSAL":
             plan = data.get("plan", "pro")
@@ -491,6 +555,20 @@ async def chat(msg: UserMessage):
     if not is_crm_question(raw, history, data):
         return {
             "response": scope_redirect_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_pricing_query(raw):
+        return {
+            "response": pricing_response(),
+            "state": "IDLE",
+            "data": data,
+        }
+
+    if is_feature_query(raw):
+        return {
+            "response": features_response(),
             "state": "IDLE",
             "data": data,
         }
