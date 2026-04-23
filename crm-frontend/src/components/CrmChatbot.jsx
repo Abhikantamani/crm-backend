@@ -14,9 +14,9 @@ const PricingCard = () => (
     </div>
     <div className="divide-y divide-slate-100">
       {[
-        { label: 'Basic',      price: '₹8,000',  note: '/month · up to 5 users',      tag: null       },
-        { label: 'Pro',        price: '₹20,000', note: '/month · up to 20 users',     tag: 'Popular'  },
-        { label: 'Enterprise', price: '₹45,000', note: '/month · unlimited users',    tag: null       },
+        { label: 'Basic',      price: '₹8,000',  note: '/month · up to 5 users',   tag: null      },
+        { label: 'Pro',        price: '₹20,000', note: '/month · up to 20 users',  tag: 'Popular' },
+        { label: 'Enterprise', price: '₹45,000', note: '/month · unlimited users', tag: null      },
       ].map(({ label, price, note, tag }) => (
         <div key={label} className={`flex items-center justify-between px-4 py-3 ${tag ? 'bg-teal-50' : ''}`}>
           <div className="flex items-center gap-2">
@@ -38,31 +38,33 @@ const PricingCard = () => (
 
 // ── Markdown renderer ─────────────────────────────────────────
 function renderMarkdown(text) {
-  return text.split('\n').map((line, i) => {
-    const isLast = i === text.split('\n').length - 1;
-    // Table row
+  return text.split('\n').map((line, i, arr) => {
+    const isLast = i === arr.length - 1;
+
+    // Table rows
     if (line.startsWith('|') && line.endsWith('|')) {
       const cells = line.split('|').filter(c => c.trim() !== '');
-      const isSep = cells.every(c => /^[-: ]+$/.test(c));
-      if (isSep) return null;
+      if (cells.every(c => /^[-: ]+$/.test(c))) return null;
       return (
-        <div key={i} className="flex text-xs font-mono border-b border-slate-100 last:border-0">
+        <div key={i} className="flex text-xs border-b border-slate-100 last:border-0 bg-slate-50 rounded">
           {cells.map((cell, j) => (
-            <span key={j} className="flex-1 px-2 py-1 text-slate-700">{cell.trim()}</span>
+            <span key={j} className="flex-1 px-2 py-1.5 text-slate-700">{cell.trim()}</span>
           ))}
         </div>
       );
     }
+
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
     const rendered = parts.map((part, j) => {
       if (part.startsWith('**') && part.endsWith('**'))
-        return <strong key={j}>{part.slice(2, -2)}</strong>;
+        return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
       if (part.startsWith('`') && part.endsWith('`'))
         return <code key={j} className="bg-slate-100 text-teal-700 px-1.5 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
       if (part.startsWith('*') && part.endsWith('*'))
         return <em key={j}>{part.slice(1, -1)}</em>;
       return <span key={j}>{part}</span>;
     });
+
     return <span key={i}>{rendered}{!isLast ? '\n' : ''}</span>;
   }).filter(Boolean);
 }
@@ -70,8 +72,9 @@ function renderMarkdown(text) {
 // ── Message Bubble ────────────────────────────────────────────
 function MessageBubble({ msg }) {
   const isBot      = msg.sender === 'bot';
-  const hasPricing = isBot && msg.text.includes('[SHOW_PRICING]');
-  const cleanText  = msg.text.replace('[SHOW_PRICING]', '').trim();
+  const hasPricing = isBot && msg.text.toLowerCase().includes('pricing plans') &&
+                     msg.text.includes('₹8,000');
+  const cleanText  = msg.text;
 
   return (
     <div className={`flex ${isBot ? 'justify-start' : 'justify-end'} mb-4`}>
@@ -101,8 +104,8 @@ function MessageBubble({ msg }) {
 const CHIPS = [
   "What is your pricing?",
   "I want a demo",
-  "I found a bug",
   "What is the next best action?",
+  "I found a bug",
 ];
 
 // ── Main Component ────────────────────────────────────────────
@@ -111,13 +114,15 @@ export default function CrmChatbot() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
-  const WELCOME = "👋 Hello! I'm your **AI Sales Assistant** for NexCRM.\n\nHow can I help you today?\n\n• 💰 **Pricing & Plans** — find the right package\n• 🎯 **Book a Demo** — see NexCRM in action\n• 📋 **Proposal / Deal** — get a personalised quote\n• 🐛 **Support Ticket** — report an issue\n• 🤖 **Features** — learn what NexCRM offers\n\nWould you like **pricing information** or to **book a demo**?";
+  const WELCOME = "👋 Hello! I'm your **AI Sales Assistant** for NexCRM.\n\nHow can I help you today? I can help you with pricing, demos, features, support, or anything else about NexCRM.\n\nWhat would you like to know?";
 
-  const [messages,  setMessages]  = useState([{ sender: 'bot', text: WELCOME }]);
-  const [input,     setInput]     = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [convState, setConvState] = useState('IDLE');
-  const [convData,  setConvData]  = useState({});
+  const [messages,   setMessages]   = useState([{ sender: 'bot', text: WELCOME }]);
+  const [input,      setInput]      = useState('');
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [convState,  setConvState]  = useState('IDLE');
+  const [convData,   setConvData]   = useState({});
+  // Full conversation history sent to Grok for context
+  const [convHistory, setConvHistory] = useState([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -126,30 +131,53 @@ export default function CrmChatbot() {
   const send = async (text) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
+
+    // Add to visible messages
     setMessages(prev => [...prev, { sender: 'user', text: trimmed }]);
     setInput('');
     setIsLoading(true);
+
+    // Build updated history to send
+    const updatedHistory = [
+      ...convHistory,
+      { role: 'user', content: trimmed }
+    ];
+
     try {
       const res = await fetch(`${BACKEND_URL}/chat`, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: trimmed,
-          user_id: sessionId.current,
-          state:   convState,
-          data:    convData,
+          message:  trimmed,
+          user_id:  sessionId.current,
+          state:    convState,
+          data:     convData,
+          history:  updatedHistory,
         }),
       });
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
+
+      const botReply = result.response || "I'm having trouble responding. Please try again.";
+
+      // Update state
       setConvState(result.state || 'IDLE');
       setConvData(result.data   || {});
-      setMessages(prev => [...prev, { sender: 'bot', text: result.response }]);
+
+      // Append bot reply to history
+      setConvHistory([
+        ...updatedHistory,
+        { role: 'assistant', content: botReply }
+      ]);
+
+      setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
+
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: "⚠️ I'm having trouble connecting right now. Please try again in a moment.\n\n*(If this is the first message, Render may be waking up — please wait 30 seconds and try again)*"
+        text: "⚠️ I'm having trouble connecting right now. Please try again in a moment.\n\n*(If this is the first message, Render may be waking up — please wait 30 seconds)*"
       }]);
     } finally {
       setIsLoading(false);
@@ -163,6 +191,7 @@ export default function CrmChatbot() {
     sessionId.current = generateSessionId();
     setConvState('IDLE');
     setConvData({});
+    setConvHistory([]);
     setMessages([{ sender: 'bot', text: WELCOME }]);
   };
 
@@ -181,7 +210,7 @@ export default function CrmChatbot() {
             <p className="text-sm font-bold text-slate-800">NexCRM Assistant</p>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-xs text-green-600 font-medium">Online · AI Sales Bot</p>
+              <p className="text-xs text-green-600 font-medium">Online · Powered by Grok AI</p>
             </div>
           </div>
         </div>
@@ -221,6 +250,7 @@ export default function CrmChatbot() {
             </div>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -229,7 +259,7 @@ export default function CrmChatbot() {
         <div className="flex gap-2 items-center">
           <input ref={inputRef} type="text" value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask about pricing, demo, features..."
+            placeholder="Ask me anything about NexCRM..."
             disabled={isLoading}
             className="flex-1 px-4 py-2.5 text-sm bg-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 focus:bg-white transition disabled:opacity-50 text-slate-800 placeholder-slate-400"
           />
@@ -240,6 +270,7 @@ export default function CrmChatbot() {
             </svg>
           </button>
         </div>
+        <p className="text-[10px] text-slate-300 text-center mt-1.5">Powered by Grok AI · NexCRM Sales Assistant</p>
       </form>
     </div>
   );
