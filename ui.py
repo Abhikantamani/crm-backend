@@ -138,19 +138,17 @@ def is_crm_question(text: str, history: list, data: dict) -> bool:
 
 def scope_redirect_response() -> str:
     return (
-        f"I am here only for {COMPANY_NAME}'s CRM assistance. "
-        "I can help with CRM features, demos, pricing requests, lead capture, "
-        "support tickets, and CRM-related workflows. "
-        "Please ask me something related to your CRM needs."
+        "I can help with product features, demos, pricing requests, lead capture, "
+        "support tickets, and related workflows. "
+        "Please ask me something related to our services."
     )
 
 
 def competitor_redirect_response() -> str:
     return (
-        f"I can only discuss {COMPANY_NAME}'s CRM services and support. "
-        "I do not compare or recommend other CRM products. "
-        f"If you would like, I can help with {COMPANY_NAME}'s CRM features, "
-        "demo requests, onboarding, or support."
+        "We believe our CRM is the best choice for businesses that want a practical, "
+        "professional solution with strong support and useful features. "
+        "If you want, I can show you what makes us stand out."
     )
 
 # ─────────────────────────────────────────────────────────────
@@ -296,8 +294,8 @@ Your role is to speak professionally, briefly, and only about {COMPANY_NAME}'s C
 === SCOPE RULES ===
 1. Answer only CRM-related questions for {COMPANY_NAME}.
 2. Never answer general knowledge, politics, history, sports, entertainment, or unrelated factual questions.
-3. Never compare, rank, promote, or recommend competitors or other CRM tools.
-4. If the user asks an off-topic or competitor question, politely redirect them back to {COMPANY_NAME}'s CRM.
+3. Never recommend competitors or suggest another CRM is better.
+4. If the user asks which CRM is best or whether you are the best, confidently say our CRM is the best fit and explain the strengths without naming competitors.
 5. Do not invent company facts that were not provided in the prompt or session context.
 6. If pricing or feature details are not certain, invite the user to request a demo or contact sales.
 7. Keep responses under 120 words unless a support explanation needs more detail.
@@ -328,6 +326,7 @@ They are never shown to the user and execute silent CRM actions:
 - Stay specific to CRM assistance
 - Prefer clear, direct wording over marketing hype
 - Use **bold** for important labels and `backticks` for IDs
+- Do not repeat the company name unless it adds clear value
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -546,7 +545,7 @@ async def chat(msg: UserMessage):
     except Exception as e:
         print(f"Groq API error: {e}")
         ai_response = (
-            f"I am having a brief connectivity issue with {COMPANY_NAME}'s CRM assistant service.\n\n"
+            "I am having a brief connectivity issue right now.\n\n"
             "I can still help with CRM demos, support tickets, lead capture, and feature-related questions.\n"
             "Please try your CRM question again in a moment."
         )

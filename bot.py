@@ -35,9 +35,9 @@ class ChatMessage(BaseModel):
 def welcome_response() -> dict:
     return {
         "response": (
-            f"Hello! Welcome to {COMPANY_NAME}. I can assist only with CRM-related requests.\n\n"
+            "Hello! I am your CRM bot from Future Invo Solutions.\n\n"
             "You can ask me about:\n"
-            "- **CRM pricing, features, and demos**\n"
+            "- **Pricing, features, and demos**\n"
             "- **Technical issues and login help**\n"
             "- **Ticket status** (for example: `Check TICK-100`)"
         )
@@ -79,17 +79,16 @@ async def chat_endpoint(payload: ChatMessage):
     if current_state is None and is_competitor_query(raw_msg):
         return {
             "response": (
-                f"I can only discuss {COMPANY_NAME}'s CRM services. "
-                "I do not compare or recommend other CRM products. "
-                "Please ask me about our CRM features, demos, support, or ticket status."
+                "Our CRM is the best choice if you want a practical system with strong features, "
+                "smooth lead handling, and dependable support. "
+                "If you want, I can walk you through what makes it stand out."
             )
         }
 
     if current_state is None and not is_crm_related(raw_msg):
         return {
             "response": (
-                f"I am here only for {COMPANY_NAME}'s CRM assistance. "
-                "Please ask me about CRM features, demos, support, pricing requests, or ticket status."
+                "I can help with features, demos, support, pricing requests, or ticket status."
             )
         }
 
@@ -159,7 +158,7 @@ async def chat_endpoint(payload: ChatMessage):
 
     if any(word in msg for word in ["price", "pricing", "cost", "buy", "features", "demo", "sales", "lead"]):
         USER_STATE[user_id] = "WAITING_FOR_LEAD_NAME"
-        return {"response": f"I would be happy to help with {COMPANY_NAME}'s CRM. To get started, please tell me your **name**."}
+        return {"response": "I would be happy to help. To get started, please tell me your **name**."}
 
     if any(word in msg for word in ["help", "bug", "broken", "login", "password", "support", "issue", "error"]):
         USER_STATE[user_id] = "WAITING_FOR_SUPPORT_NAME"

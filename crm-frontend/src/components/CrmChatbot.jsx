@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const BACKEND_URL = 'https://crm-backend-z5d9.onrender.com';
 const COMPANY_NAME = 'Future Invo Solutions';
-const ASSISTANT_NAME = 'Future Invo CRM Assistant';
+const ASSISTANT_NAME = 'CRM Bot';
 
 function generateSessionId() {
   return 'session_' + Math.random().toString(36).substring(2, 9);
@@ -11,7 +11,7 @@ function generateSessionId() {
 const PricingCard = () => (
   <div className="mt-3 w-full max-w-sm overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-lg">
     <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5">
-      <p className="text-xs font-bold uppercase tracking-widest text-white">{COMPANY_NAME}</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-white">Product Overview</p>
     </div>
     <div className="px-4 py-3 text-sm text-slate-700">
       For product details, a walkthrough, or a custom quote, ask for a demo and our team will assist you.
@@ -121,7 +121,7 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef = useRef('');
 
-  const WELCOME = `Hello! I am your **${ASSISTANT_NAME}** for **${COMPANY_NAME}**.\n\nI can help with product details, demos, lead handling, support tickets, and onboarding.\n\nHow can I help you today?`;
+  const WELCOME = 'Hello! I am your CRM bot from Future Invo Solutions.';
 
   const [messages, setMessages] = useState([{ sender: 'bot', text: WELCOME }]);
   const [input, setInput] = useState('');
@@ -229,7 +229,7 @@ export default function CrmChatbot() {
         ...prev,
         {
           sender: 'bot',
-          text: `I am having trouble connecting to ${COMPANY_NAME}'s CRM assistant right now. Please try again in a moment.`,
+          text: 'I am having trouble connecting right now. Please try again in a moment.',
         },
       ]);
     } finally {
