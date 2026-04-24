@@ -269,23 +269,31 @@ export default function CrmChatbot() {
     <div className="flex flex-col h-[680px] bg-slate-50 rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
 
       {/* ── Header ── */}
-      <div className="bg-white px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shadow-sm">
+      <div className="bg-gradient-to-r from-teal-700 to-teal-500 px-5 py-3 shadow-md">
+        {/* Company name bar */}
+        <div className="flex items-center justify-between mb-2">
+          <a href="https://futureinvo.com" target="_blank" rel="noreferrer"
+            className="text-xs font-semibold text-teal-100 tracking-widest uppercase hover:text-white transition">
+            🌐 {COMPANY_NAME}
+          </a>
+          <button onClick={handleReset}
+            className="text-xs text-teal-200 hover:text-white transition px-2 py-1 rounded-full hover:bg-white/10 font-medium">
+            New Chat
+          </button>
+        </div>
+        {/* Bot identity row */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-md">
+          <div className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-sm">F</span>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">{PRODUCT_NAME} Assistant</p>
+            <p className="text-sm font-bold text-white">{PRODUCT_NAME} Sales Assistant</p>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-xs text-green-600 font-medium">Online · {COMPANY_NAME}</p>
+              <span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse" />
+              <p className="text-xs text-teal-100 font-medium">Online · Powered by Groq AI</p>
             </div>
           </div>
         </div>
-        <button onClick={handleReset}
-          className="text-xs text-slate-400 hover:text-teal-600 transition px-3 py-1.5 rounded-full hover:bg-teal-50 font-medium">
-          New Chat
-        </button>
       </div>
 
       {/* ── Messages ── */}
