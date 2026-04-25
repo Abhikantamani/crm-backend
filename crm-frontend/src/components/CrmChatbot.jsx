@@ -45,6 +45,8 @@ function renderMarkdown(text) {
 
     // Table rows
     if (line.startsWith('|') && line.endsWith('|')) {
+      const hasContent = line.split('|').filter(c => c.trim() !== '' && !/^[-: ]+$/.test(c)).some(c => c.trim().length > 0);
+      if (!hasContent) return null;
       const cells = line.split('|').filter(c => c.trim() !== '');
       if (cells.every(c => /^[-: ]+$/.test(c))) return null;
       return (
@@ -242,8 +244,8 @@ export default function CrmChatbot() {
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
 
       // Show feedback form when conversation winds down
-      const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'thats all', 'great'];
-      if (closeWords.some(w => trimmed.toLowerCase().includes(w)) && convData.name) {
+      const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'ok bye', 'no thank', 'thats all', 'that's all', 'great', 'done', 'see you'];
+      if (closeWords.some(w => trimmed.toLowerCase().includes(w)) && messages.length >= 6) {
         setTimeout(() => setShowFeedback(true), 1200);
       }
 

@@ -219,7 +219,7 @@ ACTION TAGS (place at END of response, hidden from user):
 [ACTION:LOG_WHATSAPP] — when user asks for WhatsApp details
 [ACTION:LOG_AUTOMATION] — when user triggers automation
 
-STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices.
+STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices. NEVER output empty markdown tables or | | | patterns. Never output raw table syntax unless it has actual data in every cell.
 """
 
 # ─────────────────────────────────────────────────────────────
