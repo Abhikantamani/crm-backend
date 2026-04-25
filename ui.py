@@ -166,9 +166,12 @@ Phone: {data.get('phone', 'NOT CAPTURED')}
 Company: {data.get('company', 'NOT CAPTURED')}
 Team Size: {data.get('team_size', 'NOT CAPTURED')}
 Plan: {plan} ({price})
-Demo Booked: {'YES' if data.get('demo_booked') else 'NO'}
-Deal Created: {'YES' if data.get('deal_created') else 'NO'}
-Proposal Sent: {'YES' if data.get('proposal_sent') else 'NO'}
+
+=== ACTIONS ALREADY COMPLETED — DO NOT REPEAT THESE ===
+Deal Created: {'YES — do NOT use CREATE_DEAL again' if data.get('deal_created') else 'NO'}
+Demo Booked:  {'YES — do NOT use BOOK_DEMO again' if data.get('demo_booked') else 'NO'}
+Proposal Sent: {'YES — do NOT use SEND_PROPOSAL again' if data.get('proposal_sent') else 'NO'}
+Lead Created: {'YES — lead already exists in DB' if data.get('lead_id') else 'NO'}
 
 === DATABASE ===
 Leads: {len(CRM_DB['leads'])} | Deals: {len(CRM_DB['deals'])} | Tickets: {len(CRM_DB['support_tickets'])}
@@ -315,12 +318,33 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple:
     if email_m: data["email"] = email_m.group()
     if phone_m: data["phone"] = phone_m.group()
 
+    # Pattern 1: "my name is X" / "i am X" / "i'm X"
     name_match = re.search(
-        r"(?:my name is|i am|i'm|this is)\s+([A-Z][a-z]+(?: [A-Z][a-z]+)?)",
+        r"(?:my name is|i am|i'm|this is)\s+([A-Za-z]+(?: [A-Za-z]+)?)",
         user_message, re.IGNORECASE
     )
     if name_match and not data.get("name"):
-        data["name"] = name_match.group(1).strip()
+        data["name"] = name_match.group(1).strip().title()
+
+    # Pattern 2: "X and email is Y" — catches "naveen and email is naveen@gmail.com"
+    if not data.get("name") and data.get("email"):
+        name_before_and = re.search(
+            r"^([A-Za-z]+(?: [A-Za-z]+)?)\s+(?:and|,)",
+            user_message.strip(), re.IGNORECASE
+        )
+        if name_before_and:
+            candidate = name_before_and.group(1).strip().title()
+            if len(candidate.split()) <= 3 and candidate.lower() not in ("yes", "no", "okay", "sure", "hi", "hello"):
+                data["name"] = candidate
+
+    # Pattern 3: standalone single/double word at start if email present and no name yet
+    if not data.get("name") and data.get("email"):
+        first_word = re.match(r'^([A-Za-z]+(?:\s[A-Za-z]+)?)\b', user_message.strip())
+        if first_word:
+            candidate = first_word.group(1).strip().title()
+            if (len(candidate.split()) <= 2 and len(candidate) > 2
+                    and candidate.lower() not in ("yes", "no", "okay", "sure", "hi", "hello", "my", "the", "i")):
+                data["name"] = candidate
 
     co_match = re.search(
         r"(?:company is|from|at|working at)\s+([A-Za-z][a-zA-Z\s]+?)(?:\s*,|\s*\.|$)",
@@ -365,47 +389,53 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple:
                     )
 
         elif action_upper.startswith("CREATE_DEAL"):
-            parts = action.split(":", 1)
-            plan  = parts[1].lower().strip() if len(parts) > 1 else data.get("plan", "pro")
-            if plan not in PLANS:
-                if "enterprise" in plan: plan = "enterprise"
-                elif "pro"      in plan: plan = "pro"
-                else:                    plan = "basic"
-            data["plan"] = plan
-            p     = PLANS[plan]
-            did   = save_deal(data, p["monthly"])
-            data["deal_id"]      = did
-            data["deal_created"] = True
-            score = calc_lead_score(data)
-            crm_confirmations.append(
-                f"✅ Deal created in pipeline *(ID: `{did}`)*\n"
-                f"💼 Deal Value: **₹{p['monthly']:,}/month**\n"
-                f"📋 Stage: **Proposal** | Probability: **75%**\n"
-                f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
-            )
+            # DUPLICATE GUARD — only one deal per session
+            if not data.get("deal_created"):
+                parts = action.split(":", 1)
+                plan  = parts[1].lower().strip() if len(parts) > 1 else data.get("plan", "pro")
+                if plan not in PLANS:
+                    if "enterprise" in plan: plan = "enterprise"
+                    elif "pro"      in plan: plan = "pro"
+                    else:                    plan = "basic"
+                data["plan"] = plan
+                p     = PLANS[plan]
+                did   = save_deal(data, p["monthly"])
+                data["deal_id"]      = did
+                data["deal_created"] = True
+                score = calc_lead_score(data)
+                crm_confirmations.append(
+                    f"✅ Deal created in pipeline *(ID: `{did}`)*\n"
+                    f"💼 Deal Value: **₹{p['monthly']:,}/month**\n"
+                    f"📋 Stage: **Proposal** | Probability: **75%**\n"
+                    f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
+                )
 
         elif action_upper == "BOOK_DEMO":
-            apt  = book_apt(data)
-            data["demo_booked"] = True
-            log_comm(data, "System", f"Demo booked: {apt['date']}")
-            score = calc_lead_score(data)
-            crm_confirmations.append(
-                f"✅ Task created: Demo with **{data.get('name', 'you')}**\n"
-                f"✅ Appointment: **{apt['date']} at {apt['time']}**\n"
-                f"✅ Google Meet: `{apt['meet']}`\n"
-                f"✅ Calendar invite sent to **{data.get('email', 'your email')}**\n"
-                f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
-            )
+            # DUPLICATE GUARD — only one demo booking per session
+            if not data.get("demo_booked"):
+                apt  = book_apt(data)
+                data["demo_booked"] = True
+                log_comm(data, "System", f"Demo booked: {apt['date']}")
+                score = calc_lead_score(data)
+                crm_confirmations.append(
+                    f"✅ Task created: Demo with **{data.get('name', 'you')}**\n"
+                    f"✅ Appointment: **{apt['date']} at {apt['time']}**\n"
+                    f"✅ Google Meet: `{apt['meet']}`\n"
+                    f"✅ Calendar invite sent to **{data.get('email', 'your email')}**\n"
+                    f"🎯 Lead Score: **{score}/100** — {score_label(score)}"
+                )
 
         elif action_upper == "SEND_PROPOSAL":
-            plan = data.get("plan", "pro")
-            p    = PLANS.get(plan, PLANS["pro"])
-            log_comm(data, "Email", "Proposal sent")
-            data["proposal_sent"] = True
-            crm_confirmations.append(
-                f"✅ Proposal emailed to **{data.get('email', 'you')}**\n"
-                f"📄 Plan: **{p['label']}** — ₹{p['monthly']:,}/month"
-            )
+            # DUPLICATE GUARD — only one proposal per session
+            if not data.get("proposal_sent"):
+                plan = data.get("plan", "pro")
+                p    = PLANS.get(plan, PLANS["pro"])
+                log_comm(data, "Email", "Proposal sent")
+                data["proposal_sent"] = True
+                crm_confirmations.append(
+                    f"✅ Proposal emailed to **{data.get('email', 'you')}**\n"
+                    f"📄 Plan: **{p['label']}** — ₹{p['monthly']:,}/month"
+                )
 
         elif action_upper.startswith("CREATE_TICKET"):
             parts = action.split(":", 1)
@@ -508,10 +538,38 @@ async def chat(msg: UserMessage):
 
 
 # ─────────────────────────────────────────────────────────────
+# FEEDBACK STORAGE
+# ─────────────────────────────────────────────────────────────
+FEEDBACK_DB = []
+
+class FeedbackPayload(BaseModel):
+    user_id:  str
+    rating:   int          # 1–5
+    comment:  str = ""
+    name:     str = ""
+    email:    str = ""
+
+@app.post("/api/feedback")
+async def submit_feedback(fb: FeedbackPayload):
+    FEEDBACK_DB.append({
+        "user_id": fb.user_id,
+        "rating":  fb.rating,
+        "comment": fb.comment,
+        "name":    fb.name,
+        "email":   fb.email,
+        "time":    datetime.now().strftime("%d %b %Y %H:%M"),
+    })
+    return {"status": "ok", "message": "Thank you for your feedback!"}
+
+# ─────────────────────────────────────────────────────────────
 # ADMIN API
 # ─────────────────────────────────────────────────────────────
 @app.get("/api/admin")
 async def admin():
+    avg_rating = (
+        round(sum(f["rating"] for f in FEEDBACK_DB) / len(FEEDBACK_DB), 1)
+        if FEEDBACK_DB else 0
+    )
     return {
         "leads":             CRM_DB["leads"],
         "support_tickets":   CRM_DB["support_tickets"],
@@ -519,11 +577,14 @@ async def admin():
         "appointments":      CRM_DB["appointments"],
         "communication_log": CRM_DB["communication_log"],
         "activities":        CRM_DB["activities"],
+        "feedback":          FEEDBACK_DB,
         "stats": {
             "total_leads":    len(CRM_DB["leads"]),
             "total_tickets":  len(CRM_DB["support_tickets"]),
             "total_deals":    len(CRM_DB["deals"]),
             "pipeline_value": sum(d["value"] for d in CRM_DB["deals"]),
             "total_comms":    len(CRM_DB["communication_log"]),
+            "avg_rating":     avg_rating,
+            "total_feedback": len(FEEDBACK_DB),
         }
     }

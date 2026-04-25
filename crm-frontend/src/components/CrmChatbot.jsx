@@ -137,6 +137,10 @@ export default function CrmChatbot() {
   const [isListening,  setIsListening]  = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [speechError,  setSpeechError]  = useState('');
+  const [showFeedback,  setShowFeedback]  = useState(false);
+  const [fbRating,      setFbRating]      = useState(0);
+  const [fbComment,     setFbComment]     = useState('');
+  const [fbSubmitted,   setFbSubmitted]   = useState(false);
 
   // Auto-scroll
   useEffect(() => {
@@ -237,6 +241,12 @@ export default function CrmChatbot() {
       setConvHistory([...updatedHistory, { role: 'assistant', content: botReply }]);
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
 
+      // Show feedback form when conversation winds down
+      const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'thats all', 'great'];
+      if (closeWords.some(w => trimmed.toLowerCase().includes(w)) && convData.name) {
+        setTimeout(() => setShowFeedback(true), 1200);
+      }
+
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {
@@ -260,7 +270,25 @@ export default function CrmChatbot() {
     setSpeechError('');
     setIsListening(false);
     recognitionRef.current?.stop();
-    setMessages([{ sender: 'bot', text: WELCOME }]);
+    setShowFeedback(false); setFbRating(0); setFbComment(""); setFbSubmitted(false); setMessages([{ sender: "bot", text: WELCOME }]);
+  };
+
+  const submitFeedback = async () => {
+    if (!fbRating) return;
+    try {
+      await fetch(`${BACKEND_URL}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: sessionId.current,
+          rating: fbRating,
+          comment: fbComment,
+          name: convData.name || '',
+          email: convData.email || '',
+        }),
+      });
+    } catch (e) { console.error(e); }
+    setFbSubmitted(true);
   };
 
   const showChips = messages.length <= 2 && !isLoading;
@@ -327,6 +355,38 @@ export default function CrmChatbot() {
           </div>
         )}
 
+
+        {/* ── End-of-conversation Feedback ── */}
+        {showFeedback && (
+          <div className="mx-2 mb-4 rounded-2xl border border-teal-100 bg-white shadow-sm overflow-hidden">
+            {!fbSubmitted ? (
+              <div className="px-4 py-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">How was your experience? 😊</p>
+                <div className="flex gap-1 mb-2">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} onClick={() => setFbRating(star)}
+                      className={`text-lg transition ${fbRating >= star ? 'text-yellow-400' : 'text-slate-200 hover:text-yellow-300'}`}>
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <textarea value={fbComment} onChange={e => setFbComment(e.target.value)}
+                  placeholder="Any comments? (optional)"
+                  rows={2}
+                  className="w-full text-xs px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-400 resize-none text-slate-700 placeholder-slate-300 mb-2" />
+                <button onClick={submitFeedback} disabled={!fbRating}
+                  className="w-full bg-teal-600 text-white text-xs font-semibold py-1.5 rounded-xl hover:bg-teal-700 transition disabled:opacity-40">
+                  Submit Feedback
+                </button>
+              </div>
+            ) : (
+              <div className="px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-teal-600">Thank you for your feedback! 🙏</p>
+                <p className="text-xs text-slate-400 mt-0.5">It helps us improve NexCRM.</p>
+              </div>
+            )}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
