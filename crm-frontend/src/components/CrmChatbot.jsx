@@ -315,7 +315,7 @@ export default function CrmChatbot() {
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
 
       // Show feedback form when conversation winds down
-      const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'ok bye', 'no thank', 'thats all', 'that's all', 'great', 'done', 'see you'];
+      const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'ok bye', 'no thank', 'thats all', "that's all", 'great', 'done', 'see you'];
       if (closeWords.some(w => trimmed.toLowerCase().includes(w)) && messages.length >= 6) {
         setTimeout(() => setShowFeedback(true), 1200);
       }
