@@ -182,7 +182,11 @@ export default function CrmChatbot() {
   const transcriptRef  = useRef('');
 
 
-  const [messages, setMessages] = useState([{ sender: 'bot', text: t.welcome }]);
+  // language MUST be declared first — t depends on it
+  const [language, setLanguage] = useState('en');
+  const t = TRANSLATIONS[language];
+
+  const [messages, setMessages] = useState([{ sender: 'bot', text: TRANSLATIONS['en'].welcome }]);
   const [input,        setInput]        = useState('');
   const [isLoading,    setIsLoading]    = useState(false);
   const [convState,    setConvState]    = useState('IDLE');
@@ -195,9 +199,21 @@ export default function CrmChatbot() {
   const [fbRating,      setFbRating]      = useState(0);
   const [fbComment,     setFbComment]     = useState('');
   const [fbSubmitted,   setFbSubmitted]   = useState(false);
-  const [language, setLanguage] = useState('en');  // Language state
-  const t = TRANSLATIONS[language];  // Translation shortcut
 
+
+  // When language changes: update welcome message + speech recognition lang
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].sender === 'bot') {
+        return [{ sender: 'bot', text: TRANSLATIONS[language].welcome }];
+      }
+      return prev;
+    });
+    if (recognitionRef.current) {
+      const langMap = { en: 'en-IN', hi: 'hi-IN', te: 'te-IN', ta: 'ta-IN' };
+      recognitionRef.current.lang = langMap[language] || 'en-IN';
+    }
+  }, [language]);
   // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -470,7 +486,7 @@ export default function CrmChatbot() {
         <div className="flex gap-2 items-center">
           <input ref={inputRef} type="text" value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={isListening ? t.listening : t.placeholder.split('...')[0]} ${PRODUCT_NAME}...`}
+            placeholder={isListening ? t.listening : t.placeholder}
             disabled={isLoading}
             className={`flex-1 px-4 py-2.5 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 transition disabled:opacity-50 text-slate-800 placeholder-slate-400 ${
               isListening ? 'bg-red-50 border border-red-200 focus:bg-red-50' : 'bg-slate-100 focus:bg-white'
