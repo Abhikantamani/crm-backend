@@ -2,19 +2,25 @@ import { useState, useRef, useEffect } from 'react';
 
 const BACKEND_URL  = 'https://crm-backend-z5d9.onrender.com';
 const COMPANY_NAME = 'Future Invo Solutions';
+const PRODUCT_NAME = 'NexCRM';
 
+function generateSessionId() {
+  return 'session_' + Math.random().toString(36).substring(2, 9);
+}
+
+// ── Translations ──────────────────────────────────────────────
 const TRANSLATIONS = {
   en: {
     welcome: "👋 Hello! I'm your AI Sales Assistant for NexCRM by Future Invo Solutions.\n\nHow can I help you today? I can assist with pricing, demos, features, lead management, support, and anything about NexCRM.\n\nWhat would you like to know?",
     placeholder: "Ask me anything about NexCRM...",
-    listening: t.listening,
+    listening: "🎙️ Listening... speak now",
     newChat: "New Chat",
-    online: t.online,
-    feedbackQ: t.feedbackQ,
-    feedbackOptional: t.feedbackOptional,
-    submitFeedback: t.submitFeedback,
-    thankYouFeedback: t.thankYouFeedback,
-    helpImprove: t.helpImprove
+    online: "Online · Powered by Groq AI",
+    feedbackQ: "How was your experience? 😊",
+    feedbackOptional: "Any comments? (optional)",
+    submitFeedback: "Submit Feedback",
+    thankYouFeedback: "Thank you for your feedback! 🙏",
+    helpImprove: "It helps us improve NexCRM.",
   },
   hi: {
     welcome: "👋 नमस्ते! मैं Future Invo Solutions के NexCRM के लिए आपका AI सेल्स असिस्टेंट हूँ।\n\nमैं आपकी कैसे मदद कर सकता हूँ? मैं मूल्य निर्धारण, डेमो, सुविधाएं, लीड प्रबंधन, समर्थन और NexCRM के बारे में कुछ भी करने में मदद कर सकता हूँ।\n\nआप क्या जानना चाहते हैं?",
@@ -26,7 +32,7 @@ const TRANSLATIONS = {
     feedbackOptional: "कोई टिप्पणी? (वैकल्पिक)",
     submitFeedback: "प्रतिक्रिया सबमिट करें",
     thankYouFeedback: "आपकी प्रतिक्रिया के लिए धन्यवाद! 🙏",
-    helpImprove: "यह हमें NexCRM में सुधार करने में मदद करता है।"
+    helpImprove: "यह हमें NexCRM में सुधार करने में मदद करता है।",
   },
   te: {
     welcome: "👋 నమస్కారం! నేను Future Invo Solutions కి చెందిన NexCRM కోసం మీ AI విక్రయ సహాయకుడిని.\n\nనేను మీకు ఎలా సహాయం చేయగలను? నేను ధర నిర్ణయం, డెమో, లక్షణాలు, లీడ్ నిర్వహణ, సపోర్టు మరియు NexCRM గురించి ఏదైనా సహాయం చేయవచ్చు.\n\nమీరు ఏమి తెలుసుకోవాలనుకుంటున్నారు?",
@@ -38,10 +44,10 @@ const TRANSLATIONS = {
     feedbackOptional: "ఏదైనా వ్యాఖ్యలు? (ఐచ్ఛికం)",
     submitFeedback: "ప్రతిక్రియ సమర్పించండి",
     thankYouFeedback: "మీ ప్రతిక్రియ కోసం ధన్యవాదాలు! 🙏",
-    helpImprove: "ఇది NexCRM లో సుధారించటానికి సహాయం చేస్తుంది."
+    helpImprove: "ఇది NexCRM లో సుధారించటానికి సహాయం చేస్తుంది.",
   },
   ta: {
-    welcome: "👋 வணக்கம்! நான் Future Invo Solutions இன் NexCRM க்கான உங்கள் AI விற்பனை உதவியாளர்.\n\nநான் உங்களுக்கு எவ்வாறு உதவ முடியும்? நான் விலை நிர்ణயம், டெமோ, அம்சங்கள், லீட் மேலாண்மை, ஆதரவு மற்றும் NexCRM பற்றி எதுவும் உதவ முடியும்.\n\nநீங்கள் எதை அறிய விரும்புகிறீர்கள்?",
+    welcome: "👋 வணக்கம்! நான் Future Invo Solutions இன் NexCRM க்கான உங்கள் AI விற்பனை உதவியாளர்.\n\nநான் உங்களுக்கு எவ்வாறு உதவ முடியும்? நான் விலை நிர்ணயம், டெமோ, அம்சங்கள், லீட் மேலாண்மை, ஆதரவு மற்றும் NexCRM பற்றி எதுவும் உதவ முடியும்.\n\nநீங்கள் எதை அறிய விரும்புகிறீர்கள்?",
     placeholder: "NexCRM பற்றி எதுவும் கேளுங்கள்...",
     listening: "🎙️ கேட்டுக்கொண்டிருக்கிறேன்... இப்போது பேசுங்கள்",
     newChat: "புதிய உரையாடல்",
@@ -50,16 +56,9 @@ const TRANSLATIONS = {
     feedbackOptional: "ஏதாவது கருத்துகள்? (விருப்பத்தேர்வு)",
     submitFeedback: "கருத்தை சமர்ப்பிக்கவும்",
     thankYouFeedback: "உங்கள் கருத்துக்கு நன்றி! 🙏",
-    helpImprove: "இது NexCRM ஐ மேம்படுத்த உதவுகிறது."
-  }
+    helpImprove: "இது NexCRM ஐ மேம்படுத்த உதவுகிறது.",
+  },
 };
-
-
-const PRODUCT_NAME = 'NexCRM';
-
-function generateSessionId() {
-  return 'session_' + Math.random().toString(36).substring(2, 9);
-}
 
 // ── Pricing Card ──────────────────────────────────────────────
 const PricingCard = () => (
@@ -95,13 +94,11 @@ const PricingCard = () => (
 function renderMarkdown(text) {
   return text.split('\n').map((line, i, arr) => {
     const isLast = i === arr.length - 1;
-
-    // Table rows
     if (line.startsWith('|') && line.endsWith('|')) {
-      const hasContent = line.split('|').filter(c => c.trim() !== '' && !/^[-: ]+$/.test(c)).some(c => c.trim().length > 0);
-      if (!hasContent) return null;
       const cells = line.split('|').filter(c => c.trim() !== '');
-      if (cells.every(c => /^[-: ]+$/.test(c))) return null;
+      const isSep = cells.every(c => /^[-: ]+$/.test(c));
+      const isEmpty = cells.every(c => c.trim() === '');
+      if (isSep || isEmpty) return null;
       return (
         <div key={i} className="flex text-xs border-b border-slate-100 last:border-0 bg-slate-50 rounded">
           {cells.map((cell, j) => (
@@ -110,7 +107,6 @@ function renderMarkdown(text) {
         </div>
       );
     }
-
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
     const rendered = parts.map((part, j) => {
       if (part.startsWith('**') && part.endsWith('**'))
@@ -121,7 +117,6 @@ function renderMarkdown(text) {
         return <em key={j}>{part.slice(1, -1)}</em>;
       return <span key={j}>{part}</span>;
     });
-
     return <span key={i}>{rendered}{!isLast ? '\n' : ''}</span>;
   }).filter(Boolean);
 }
@@ -129,9 +124,7 @@ function renderMarkdown(text) {
 // ── Message Bubble ────────────────────────────────────────────
 function MessageBubble({ msg }) {
   const isBot      = msg.sender === 'bot';
-  const hasPricing = isBot && msg.text.toLowerCase().includes('pricing plans') &&
-                     msg.text.includes('₹8,000');
-
+  const hasPricing = isBot && msg.text.toLowerCase().includes('pricing plans') && msg.text.includes('₹8,000');
   return (
     <div className={`flex ${isBot ? 'justify-start' : 'justify-end'} mb-4`}>
       {isBot && (
@@ -157,21 +150,20 @@ function MessageBubble({ msg }) {
 }
 
 // ── Quick Chips ───────────────────────────────────────────────
-const CHIPS = [
-  'What are your pricing plans?',
-  'I want a demo',
-  'What is the next best action?',
-  'I found a bug',
-];
+const CHIPS = ['What are your pricing plans?', 'I want a demo', 'What is the next best action?', 'I found a bug'];
 
 // ── Mic Icon ──────────────────────────────────────────────────
-const MicIcon = ({ active }) => (
+const MicIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 013 3v6a3 3 0 11-6 0V6a3 3 0 013-3z" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-14 0" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v3M8 21h8" />
   </svg>
 );
+
+// ── Language labels ───────────────────────────────────────────
+const LANG_LABELS = { en: 'EN', hi: 'HI', te: 'TE', ta: 'TA' };
+const LANG_SPEECH = { en: 'en-IN', hi: 'hi-IN', te: 'te-IN', ta: 'ta-IN' };
 
 // ── Main Component ────────────────────────────────────────────
 export default function CrmChatbot() {
@@ -181,27 +173,30 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef  = useRef('');
 
-
-  // language MUST be declared first — t depends on it
-  const [language, setLanguage] = useState('en');
+  // language MUST be first — t depends on it
+  const [language,       setLanguage]       = useState('en');
   const t = TRANSLATIONS[language];
 
-  const [messages, setMessages] = useState([{ sender: 'bot', text: TRANSLATIONS['en'].welcome }]);
-  const [input,        setInput]        = useState('');
-  const [isLoading,    setIsLoading]    = useState(false);
-  const [convState,    setConvState]    = useState('IDLE');
-  const [convData,     setConvData]     = useState({});
-  const [convHistory,  setConvHistory]  = useState([]);
-  const [isListening,  setIsListening]  = useState(false);
+  const [messages,       setMessages]       = useState([{ sender: 'bot', text: TRANSLATIONS.en.welcome }]);
+  const [input,          setInput]          = useState('');
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [convState,      setConvState]      = useState('IDLE');
+  const [convData,       setConvData]       = useState({});
+  const [convHistory,    setConvHistory]    = useState([]);
+  const [isListening,    setIsListening]    = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [speechError,  setSpeechError]  = useState('');
-  const [showFeedback,  setShowFeedback]  = useState(false);
-  const [fbRating,      setFbRating]      = useState(0);
-  const [fbComment,     setFbComment]     = useState('');
-  const [fbSubmitted,   setFbSubmitted]   = useState(false);
+  const [speechError,    setSpeechError]    = useState('');
+  const [showFeedback,   setShowFeedback]   = useState(false);
+  const [fbRating,       setFbRating]       = useState(0);
+  const [fbComment,      setFbComment]      = useState('');
+  const [fbSubmitted,    setFbSubmitted]    = useState(false);
 
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
-  // When language changes: update welcome message + speech recognition lang
+  // Language change → update welcome + speech lang
   useEffect(() => {
     setMessages(prev => {
       if (prev.length === 1 && prev[0].sender === 'bot') {
@@ -210,70 +205,44 @@ export default function CrmChatbot() {
       return prev;
     });
     if (recognitionRef.current) {
-      const langMap = { en: 'en-IN', hi: 'hi-IN', te: 'te-IN', ta: 'ta-IN' };
-      recognitionRef.current.lang = langMap[language] || 'en-IN';
+      recognitionRef.current.lang = LANG_SPEECH[language] || 'en-IN';
     }
   }, [language]);
-  // Auto-scroll
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
 
   // Setup Speech Recognition
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
-      return;
-    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setSpeechSupported(false); return; }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = language === 'hi' ? 'hi-IN' : language === 'te' ? 'te-IN' : language === 'ta' ? 'ta-IN' : 'en-IN';
-    recognition.continuous       = false;
-    recognition.interimResults   = true;
+    const recognition = new SR();
+    recognition.lang           = LANG_SPEECH[language] || 'en-IN';
+    recognition.continuous     = false;
+    recognition.interimResults = true;
 
-    recognition.onstart = () => {
-      transcriptRef.current = '';
-      setSpeechError('');
-      setIsListening(true);
-    };
+    recognition.onstart = () => { transcriptRef.current = ''; setSpeechError(''); setIsListening(true); };
 
     recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map(r => r[0]?.transcript || '')
-        .join(' ')
-        .trim();
+      const transcript = Array.from(event.results).map(r => r[0]?.transcript || '').join(' ').trim();
       transcriptRef.current = transcript;
       setInput(transcript);
     };
 
     recognition.onerror = (event) => {
-      const errors = {
-        'not-allowed':    'Microphone access blocked. Please allow permission and try again.',
-        'no-speech':      'No speech detected. Please try again.',
-        'audio-capture':  'No microphone found on this device.',
-      };
+      const errors = { 'not-allowed': 'Microphone access blocked. Please allow permission.', 'no-speech': 'No speech detected. Try again.', 'audio-capture': 'No microphone found.' };
       setSpeechError(errors[event.error] || 'Voice input failed. Please try again.');
       setIsListening(false);
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-      if (transcriptRef.current) inputRef.current?.focus();
-    };
+    recognition.onend = () => { setIsListening(false); if (transcriptRef.current) inputRef.current?.focus(); };
 
     recognitionRef.current = recognition;
     setSpeechSupported(true);
-
     return () => recognition.stop();
   }, []);
 
   const toggleVoice = () => {
     if (!recognitionRef.current || isLoading) return;
-    if (isListening) {
-      recognitionRef.current.stop();
-      return;
-    }
+    if (isListening) { recognitionRef.current.stop(); return; }
     transcriptRef.current = '';
     setInput('');
     setSpeechError('');
@@ -283,49 +252,39 @@ export default function CrmChatbot() {
   const send = async (text) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
-
     setMessages(prev => [...prev, { sender: 'user', text: trimmed }]);
     setInput('');
     setSpeechError('');
     setIsLoading(true);
-
     const updatedHistory = [...convHistory, { role: 'user', content: trimmed }];
-
     try {
       const res = await fetch(`${BACKEND_URL}/chat`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: trimmed,
-          user_id: sessionId.current,
-          state:   convState,
-          data:    convData,
-          history: updatedHistory,
+          message:  trimmed,
+          user_id:  sessionId.current,
+          state:    convState,
+          data:     convData,
+          history:  updatedHistory,
           language: language,
         }),
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result  = await res.json();
+      const result   = await res.json();
       const botReply = result.response || 'I am having trouble responding. Please try again.';
-
       setConvState(result.state || 'IDLE');
       setConvData(result.data   || {});
       setConvHistory([...updatedHistory, { role: 'assistant', content: botReply }]);
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
-
-      // Show feedback form when conversation winds down
+      // Show feedback on closing words after enough messages
       const closeWords = ['thank you', 'thanks', 'goodbye', 'bye', 'ok bye', 'no thank', 'thats all', "that's all", 'great', 'done', 'see you'];
       if (closeWords.some(w => trimmed.toLowerCase().includes(w)) && messages.length >= 6) {
         setTimeout(() => setShowFeedback(true), 1200);
       }
-
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, {
-        sender: 'bot',
-        text: '⚠️ I\'m having trouble connecting right now. Please try again in a moment.\n\n*(If this is the first message, Render may be waking up — wait 30 seconds and retry)*'
-      }]);
+      setMessages(prev => [...prev, { sender: 'bot', text: "I'm having trouble connecting right now. Please try again in a moment." }]);
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -342,8 +301,12 @@ export default function CrmChatbot() {
     setInput('');
     setSpeechError('');
     setIsListening(false);
+    setShowFeedback(false);
+    setFbRating(0);
+    setFbComment('');
+    setFbSubmitted(false);
     recognitionRef.current?.stop();
-    setShowFeedback(false); setFbRating(0); setFbComment(""); setFbSubmitted(false); setMessages([{ sender: "bot", text: t.welcome }]);
+    setMessages([{ sender: 'bot', text: TRANSLATIONS[language].welcome }]);
   };
 
   const submitFeedback = async () => {
@@ -352,13 +315,7 @@ export default function CrmChatbot() {
       await fetch(`${BACKEND_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: sessionId.current,
-          rating: fbRating,
-          comment: fbComment,
-          name: convData.name || '',
-          email: convData.email || '',
-        }),
+        body: JSON.stringify({ user_id: sessionId.current, rating: fbRating, comment: fbComment, name: convData.name || '', email: convData.email || '' }),
       });
     } catch (e) { console.error(e); }
     setFbSubmitted(true);
@@ -371,28 +328,23 @@ export default function CrmChatbot() {
 
       {/* ── Header ── */}
       <div className="bg-gradient-to-r from-teal-700 to-teal-500 px-5 py-3 shadow-md">
-        {/* Company name bar */}
+        {/* Top bar: company + language toggle + new chat */}
         <div className="flex items-center justify-between mb-2">
           <a href="https://futureinvo.com" target="_blank" rel="noreferrer"
             className="text-xs font-semibold text-teal-100 tracking-widest uppercase hover:text-white transition">
             🌐 {COMPANY_NAME}
           </a>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {/* Language Toggle */}
-            <div className="flex gap-0.5 bg-white/10 rounded-full p-0.5">
-              {['en', 'hi', 'te', 'ta'].map(lang => {
-                const labels = { en: '🇬🇧 EN', hi: '🇮🇳 HI', te: '🇮🇳 TE', ta: '🇮🇳 TA' };
-                return (
-                  <button key={lang} onClick={() => setLanguage(lang)}
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition ${
-                      language === lang
-                        ? 'bg-white text-teal-700'
-                        : 'text-teal-100 hover:text-white'
-                    }`}>
-                    {labels[lang]}
-                  </button>
-                );
-              })}
+            <div className="flex gap-0.5 bg-white/15 rounded-full p-0.5">
+              {['en', 'hi', 'te', 'ta'].map(lang => (
+                <button key={lang} onClick={() => setLanguage(lang)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition ${
+                    language === lang ? 'bg-white text-teal-700' : 'text-teal-100 hover:text-white'
+                  }`}>
+                  {LANG_LABELS[lang]}
+                </button>
+              ))}
             </div>
             <button onClick={handleReset}
               className="text-xs text-teal-200 hover:text-white transition px-2 py-1 rounded-full hover:bg-white/10 font-medium">
@@ -409,7 +361,7 @@ export default function CrmChatbot() {
             <p className="text-sm font-bold text-white">{PRODUCT_NAME} Sales Assistant</p>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse" />
-              <p className="text-xs text-teal-100 font-medium">Online · Powered by Groq AI</p>
+              <p className="text-xs text-teal-100 font-medium">{t.online}</p>
             </div>
           </div>
         </div>
@@ -438,46 +390,48 @@ export default function CrmChatbot() {
             <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
               <div className="flex gap-1 items-center h-4">
                 {[0, 150, 300].map(d => (
-                  <span key={d} className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                    style={{ animationDelay: `${d}ms` }} />
+                  <span key={d} className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
                 ))}
               </div>
             </div>
           </div>
         )}
 
-
-        {/* ── End-of-conversation Feedback ── */}
+        {/* ── Feedback Form ── */}
         {showFeedback && (
           <div className="mx-2 mb-4 rounded-2xl border border-teal-100 bg-white shadow-sm overflow-hidden">
             {!fbSubmitted ? (
               <div className="px-4 py-3">
-                <p className="text-xs font-semibold text-slate-600 mb-2">How was your experience? 😊</p>
+                <p className="text-xs font-semibold text-slate-600 mb-2">{t.feedbackQ}</p>
                 <div className="flex gap-1 mb-2">
-                  {[1,2,3,4,5].map(star => (
+                  {[1, 2, 3, 4, 5].map(star => (
                     <button key={star} onClick={() => setFbRating(star)}
                       className={`text-lg transition ${fbRating >= star ? 'text-yellow-400' : 'text-slate-200 hover:text-yellow-300'}`}>
                       ★
                     </button>
                   ))}
                 </div>
-                <textarea value={fbComment} onChange={e => setFbComment(e.target.value)}
-                  placeholder=t.feedbackOptional
+                <textarea
+                  value={fbComment}
+                  onChange={e => setFbComment(e.target.value)}
+                  placeholder={t.feedbackOptional}
                   rows={2}
-                  className="w-full text-xs px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-400 resize-none text-slate-700 placeholder-slate-300 mb-2" />
+                  className="w-full text-xs px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-400 resize-none text-slate-700 placeholder-slate-300 mb-2"
+                />
                 <button onClick={submitFeedback} disabled={!fbRating}
                   className="w-full bg-teal-600 text-white text-xs font-semibold py-1.5 rounded-xl hover:bg-teal-700 transition disabled:opacity-40">
-                  Submit Feedback
+                  {t.submitFeedback}
                 </button>
               </div>
             ) : (
               <div className="px-4 py-3 text-center">
-                <p className="text-sm font-semibold text-teal-600">Thank you for your feedback! 🙏</p>
-                <p className="text-xs text-slate-400 mt-0.5">It helps us improve NexCRM.</p>
+                <p className="text-sm font-semibold text-teal-600">{t.thankYouFeedback}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{t.helpImprove}</p>
               </div>
             )}
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -489,24 +443,18 @@ export default function CrmChatbot() {
             placeholder={isListening ? t.listening : t.placeholder}
             disabled={isLoading}
             className={`flex-1 px-4 py-2.5 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 transition disabled:opacity-50 text-slate-800 placeholder-slate-400 ${
-              isListening ? 'bg-red-50 border border-red-200 focus:bg-red-50' : 'bg-slate-100 focus:bg-white'
+              isListening ? 'bg-red-50 border border-red-200' : 'bg-slate-100 focus:bg-white'
             }`}
           />
-
-          {/* Voice button */}
           {speechSupported && (
             <button type="button" onClick={toggleVoice} disabled={isLoading}
               aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
               className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition border ${
-                isListening
-                  ? 'bg-red-500 border-red-500 text-white animate-pulse'
-                  : 'bg-white border-teal-200 text-teal-600 hover:bg-teal-50'
+                isListening ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-white border-teal-200 text-teal-600 hover:bg-teal-50'
               } disabled:opacity-40`}>
-              <MicIcon active={isListening} />
+              <MicIcon />
             </button>
           )}
-
-          {/* Send button */}
           <button type="submit" disabled={isLoading || !input.trim()}
             className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-700 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-40 shadow-md flex-shrink-0">
             <svg className="w-4 h-4 text-white translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -514,16 +462,12 @@ export default function CrmChatbot() {
             </svg>
           </button>
         </div>
-
-        {/* Status bar */}
         <div className="mt-1.5 min-h-[14px] text-center text-[10px] text-slate-400">
           {speechError
             ? <span className="text-red-500">{speechError}</span>
             : isListening
-              ? <span className="text-red-500 font-medium">🔴 Listening — speak now, your words will appear above</span>
-              : speechSupported
-                ? `Powered by Groq AI · ${COMPANY_NAME}`
-                : `${PRODUCT_NAME} Sales Assistant · ${COMPANY_NAME}`
+              ? <span className="text-red-500 font-medium">🔴 Listening — speak now</span>
+              : <span>Powered by Groq AI · {COMPANY_NAME}</span>
           }
         </div>
       </form>
