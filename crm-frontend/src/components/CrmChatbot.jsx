@@ -2,6 +2,59 @@ import { useState, useRef, useEffect } from 'react';
 
 const BACKEND_URL  = 'https://crm-backend-z5d9.onrender.com';
 const COMPANY_NAME = 'Future Invo Solutions';
+
+const TRANSLATIONS = {
+  en: {
+    welcome: "👋 Hello! I'm your AI Sales Assistant for NexCRM by Future Invo Solutions.\n\nHow can I help you today? I can assist with pricing, demos, features, lead management, support, and anything about NexCRM.\n\nWhat would you like to know?",
+    placeholder: "Ask me anything about NexCRM...",
+    listening: t.listening,
+    newChat: "New Chat",
+    online: t.online,
+    feedbackQ: t.feedbackQ,
+    feedbackOptional: t.feedbackOptional,
+    submitFeedback: t.submitFeedback,
+    thankYouFeedback: t.thankYouFeedback,
+    helpImprove: t.helpImprove
+  },
+  hi: {
+    welcome: "👋 नमस्ते! मैं Future Invo Solutions के NexCRM के लिए आपका AI सेल्स असिस्टेंट हूँ।\n\nमैं आपकी कैसे मदद कर सकता हूँ? मैं मूल्य निर्धारण, डेमो, सुविधाएं, लीड प्रबंधन, समर्थन और NexCRM के बारे में कुछ भी करने में मदद कर सकता हूँ।\n\nआप क्या जानना चाहते हैं?",
+    placeholder: "NexCRM के बारे में कुछ भी पूछें...",
+    listening: "🎙️ सुन रहा हूँ... अब बोलें",
+    newChat: "नई बातचीत",
+    online: "ऑनलाइन · Groq AI द्वारा संचालित",
+    feedbackQ: "आपका अनुभव कैसा रहा? 😊",
+    feedbackOptional: "कोई टिप्पणी? (वैकल्पिक)",
+    submitFeedback: "प्रतिक्रिया सबमिट करें",
+    thankYouFeedback: "आपकी प्रतिक्रिया के लिए धन्यवाद! 🙏",
+    helpImprove: "यह हमें NexCRM में सुधार करने में मदद करता है।"
+  },
+  te: {
+    welcome: "👋 నమస్కారం! నేను Future Invo Solutions కి చెందిన NexCRM కోసం మీ AI విక్రయ సహాయకుడిని.\n\nనేను మీకు ఎలా సహాయం చేయగలను? నేను ధర నిర్ణయం, డెమో, లక్షణాలు, లీడ్ నిర్వహణ, సపోర్టు మరియు NexCRM గురించి ఏదైనా సహాయం చేయవచ్చు.\n\nమీరు ఏమి తెలుసుకోవాలనుకుంటున్నారు?",
+    placeholder: "NexCRM గురించి ఏదైనా అడగండి...",
+    listening: "🎙️ వింటున్నాను... ఇప్పుడు మాట్లాడండి",
+    newChat: "కొత్త సంభాషణ",
+    online: "ఆన్‌లైన్ · Groq AI ద్వారా",
+    feedbackQ: "మీ అనుభవం ఎలా ఉంది? 😊",
+    feedbackOptional: "ఏదైనా వ్యాఖ్యలు? (ఐచ్ఛికం)",
+    submitFeedback: "ప్రతిక్రియ సమర్పించండి",
+    thankYouFeedback: "మీ ప్రతిక్రియ కోసం ధన్యవాదాలు! 🙏",
+    helpImprove: "ఇది NexCRM లో సుధారించటానికి సహాయం చేస్తుంది."
+  },
+  ta: {
+    welcome: "👋 வணக்கம்! நான் Future Invo Solutions இன் NexCRM க்கான உங்கள் AI விற்பனை உதவியாளர்.\n\nநான் உங்களுக்கு எவ்வாறு உதவ முடியும்? நான் விலை நிர்ణயம், டெமோ, அம்சங்கள், லீட் மேலாண்மை, ஆதரவு மற்றும் NexCRM பற்றி எதுவும் உதவ முடியும்.\n\nநீங்கள் எதை அறிய விரும்புகிறீர்கள்?",
+    placeholder: "NexCRM பற்றி எதுவும் கேளுங்கள்...",
+    listening: "🎙️ கேட்டுக்கொண்டிருக்கிறேன்... இப்போது பேசுங்கள்",
+    newChat: "புதிய உரையாடல்",
+    online: "ஆன்லைன் · Groq AI ஆல் இயக்கப்படுகிறது",
+    feedbackQ: "உங்கள் அனுபவம் எப்படி இருந்தது? 😊",
+    feedbackOptional: "ஏதாவது கருத்துகள்? (விருப்பத்தேர்வு)",
+    submitFeedback: "கருத்தை சமர்ப்பிக்கவும்",
+    thankYouFeedback: "உங்கள் கருத்துக்கு நன்றி! 🙏",
+    helpImprove: "இது NexCRM ஐ மேம்படுத்த உதவுகிறது."
+  }
+};
+
+
 const PRODUCT_NAME = 'NexCRM';
 
 function generateSessionId() {
@@ -128,9 +181,8 @@ export default function CrmChatbot() {
   const recognitionRef = useRef(null);
   const transcriptRef  = useRef('');
 
-  const WELCOME = `👋 Hello! I'm your AI Sales Assistant for **${PRODUCT_NAME}** by **${COMPANY_NAME}**.\n\nHow can I help you today? I can assist with pricing, demos, features, lead management, support, and anything about ${PRODUCT_NAME}.\n\nWhat would you like to know?`;
 
-  const [messages,     setMessages]     = useState([{ sender: 'bot', text: WELCOME }]);
+  const [messages, setMessages] = useState([{ sender: 'bot', text: t.welcome }]);
   const [input,        setInput]        = useState('');
   const [isLoading,    setIsLoading]    = useState(false);
   const [convState,    setConvState]    = useState('IDLE');
@@ -143,6 +195,8 @@ export default function CrmChatbot() {
   const [fbRating,      setFbRating]      = useState(0);
   const [fbComment,     setFbComment]     = useState('');
   const [fbSubmitted,   setFbSubmitted]   = useState(false);
+  const [language, setLanguage] = useState('en');  // Language state
+  const t = TRANSLATIONS[language];  // Translation shortcut
 
   // Auto-scroll
   useEffect(() => {
@@ -158,7 +212,7 @@ export default function CrmChatbot() {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang             = 'en-IN';
+    recognition.lang = language === 'hi' ? 'hi-IN' : language === 'te' ? 'te-IN' : language === 'ta' ? 'ta-IN' : 'en-IN';
     recognition.continuous       = false;
     recognition.interimResults   = true;
 
@@ -231,6 +285,7 @@ export default function CrmChatbot() {
           state:   convState,
           data:    convData,
           history: updatedHistory,
+          language: language,
         }),
       });
 
@@ -272,7 +327,7 @@ export default function CrmChatbot() {
     setSpeechError('');
     setIsListening(false);
     recognitionRef.current?.stop();
-    setShowFeedback(false); setFbRating(0); setFbComment(""); setFbSubmitted(false); setMessages([{ sender: "bot", text: WELCOME }]);
+    setShowFeedback(false); setFbRating(0); setFbComment(""); setFbSubmitted(false); setMessages([{ sender: "bot", text: t.welcome }]);
   };
 
   const submitFeedback = async () => {
@@ -306,10 +361,28 @@ export default function CrmChatbot() {
             className="text-xs font-semibold text-teal-100 tracking-widest uppercase hover:text-white transition">
             🌐 {COMPANY_NAME}
           </a>
-          <button onClick={handleReset}
-            className="text-xs text-teal-200 hover:text-white transition px-2 py-1 rounded-full hover:bg-white/10 font-medium">
-            New Chat
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Language Toggle */}
+            <div className="flex gap-0.5 bg-white/10 rounded-full p-0.5">
+              {['en', 'hi', 'te', 'ta'].map(lang => {
+                const labels = { en: '🇬🇧 EN', hi: '🇮🇳 HI', te: '🇮🇳 TE', ta: '🇮🇳 TA' };
+                return (
+                  <button key={lang} onClick={() => setLanguage(lang)}
+                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition ${
+                      language === lang
+                        ? 'bg-white text-teal-700'
+                        : 'text-teal-100 hover:text-white'
+                    }`}>
+                    {labels[lang]}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={handleReset}
+              className="text-xs text-teal-200 hover:text-white transition px-2 py-1 rounded-full hover:bg-white/10 font-medium">
+              {t.newChat}
+            </button>
+          </div>
         </div>
         {/* Bot identity row */}
         <div className="flex items-center gap-3">
@@ -373,7 +446,7 @@ export default function CrmChatbot() {
                   ))}
                 </div>
                 <textarea value={fbComment} onChange={e => setFbComment(e.target.value)}
-                  placeholder="Any comments? (optional)"
+                  placeholder=t.feedbackOptional
                   rows={2}
                   className="w-full text-xs px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-400 resize-none text-slate-700 placeholder-slate-300 mb-2" />
                 <button onClick={submitFeedback} disabled={!fbRating}
@@ -397,7 +470,7 @@ export default function CrmChatbot() {
         <div className="flex gap-2 items-center">
           <input ref={inputRef} type="text" value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={isListening ? '🎙️ Listening... speak now' : `Ask me anything about ${PRODUCT_NAME}...`}
+            placeholder={isListening ? t.listening : t.placeholder.split('...')[0]} ${PRODUCT_NAME}...`}
             disabled={isLoading}
             className={`flex-1 px-4 py-2.5 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 transition disabled:opacity-50 text-slate-800 placeholder-slate-400 ${
               isListening ? 'bg-red-50 border border-red-200 focus:bg-red-50' : 'bg-slate-100 focus:bg-white'

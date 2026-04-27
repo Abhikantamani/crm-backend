@@ -30,6 +30,7 @@ class UserMessage(BaseModel):
     message: str
     user_id: str
     state:   str  = "IDLE"
+    language: str = "en"  # Language code: en, hi, te, ta
     data:    dict = {}
     history: list = []
 
@@ -227,7 +228,7 @@ ACTION TAGS (place at END of response, hidden from user):
 [ACTION:LOG_WHATSAPP] — when user asks for WhatsApp details
 [ACTION:LOG_AUTOMATION] — when user triggers automation
 
-STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices. NEVER output empty markdown tables or | | | patterns. Never output raw table syntax unless it has actual data in every cell.
+RESPOND IN {lang.upper()} LANGUAGE ONLY. STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices. NEVER output empty markdown tables or | | | patterns. Never output raw table syntax unless it has actual data in every cell.
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -402,8 +403,9 @@ def process_actions(response_text: str, data: dict, user_message: str) -> tuple:
 # MAIN ENDPOINT
 # ─────────────────────────────────────────────────────────────
 @app.post("/chat")
-async def chat(msg: UserMessage):
+async def chat(msg: UserMessage):  # language in msg
     raw     = msg.message.strip()
+    lang    = msg.language  # Get user's language
     state   = msg.state
     data    = dict(msg.data)
     history = list(msg.history)
