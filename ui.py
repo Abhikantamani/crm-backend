@@ -228,7 +228,7 @@ ACTION TAGS (place at END of response, hidden from user):
 [ACTION:LOG_WHATSAPP] — when user asks for WhatsApp details
 [ACTION:LOG_AUTOMATION] — when user triggers automation
 
-RESPOND IN {lang.upper()} LANGUAGE ONLY. STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices. NEVER output empty markdown tables or | | | patterns. Never output raw table syntax unless it has actual data in every cell.
+STYLE: Max 120 words. Use **bold** for numbers, `backticks` for IDs. Always end with a next step. Use ₹ for prices. NEVER output empty markdown tables or | | | patterns. Never output raw table syntax unless it has actual data in every cell.
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -431,7 +431,7 @@ async def chat(msg: UserMessage):  # language in msg
     # Build context + messages
     crm_context = build_crm_context(data)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + crm_context}
+        {"role": "system", "content": SYSTEM_PROMPT + "\n\nRESPOND ONLY IN " + {"en":"English","hi":"Hindi","te":"Telugu","ta":"Tamil"}.get(lang,"English") + " language. Do not mix languages." + "\n\n" + crm_context}
     ]
     for turn in history[-6:]:  # Limit history to save tokens
         if turn.get("role") and turn.get("content"):
