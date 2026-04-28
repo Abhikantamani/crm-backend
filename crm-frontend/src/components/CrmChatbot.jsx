@@ -15,7 +15,7 @@ const TRANSLATIONS = {
     placeholder: "Ask me anything about NexCRM...",
     listening: "🎙️ Listening... speak now",
     newChat: "New Chat",
-    online: "Online · Powered by Groq AI",
+    online: "Online · Powered by Gemini AI",
     feedbackQ: "How was your experience? 😊",
     feedbackOptional: "Any comments? (optional)",
     submitFeedback: "Submit Feedback",
@@ -27,7 +27,7 @@ const TRANSLATIONS = {
     placeholder: "NexCRM के बारे में कुछ भी पूछें...",
     listening: "🎙️ सुन रहा हूँ... अब बोलें",
     newChat: "नई बातचीत",
-    online: "ऑनलाइन · Groq AI द्वारा संचालित",
+    online: "ऑनलाइन · Gemini AI द्वारा संचालित",
     feedbackQ: "आपका अनुभव कैसा रहा? 😊",
     feedbackOptional: "कोई टिप्पणी? (वैकल्पिक)",
     submitFeedback: "प्रतिक्रिया सबमिट करें",
@@ -467,7 +467,7 @@ export default function CrmChatbot() {
             ? <span className="text-red-500">{speechError}</span>
             : isListening
               ? <span className="text-red-500 font-medium">🔴 Listening — speak now</span>
-              : <span>Powered by Groq AI · {COMPANY_NAME}</span>
+              : <span>Powered by Gemini AI · {COMPANY_NAME}</span>
           }
         </div>
       </form>

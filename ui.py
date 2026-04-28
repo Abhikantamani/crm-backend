@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from groq import Groq
+import google.generativeai as genai
 import re, random, os
 from datetime import datetime, timedelta
 
@@ -13,8 +13,15 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
 # GROQCLOUD CLIENT
 # Render → Environment → GROQ_API_KEY = gsk_xxxxx
 # ─────────────────────────────────────────────────────────────
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "YOUR_GROQ_API_KEY")
-groq_client  = Groq(api_key=GROQ_API_KEY)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
+gemini_model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash",
+    generation_config=genai.GenerationConfig(
+        max_output_tokens=400,
+        temperature=0.4,
+    )
+)
 
 # ─────────────────────────────────────────────────────────────
 # COMPANY
@@ -438,17 +445,22 @@ async def chat(msg: UserMessage):  # language in msg
             messages.append({"role": turn["role"], "content": turn["content"]})
     messages.append({"role": "user", "content": raw})
 
-    # Call GroqCloud
+    # Call Gemini API
     try:
-        completion = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",   # 1M TPD free limit vs 100K for 70b
-            messages=messages,
-            max_tokens=350,  # shorter = fewer tokens burned
-            temperature=0.4,  # Lower = more focused, less likely to go off-topic
-        )
-        ai_response = completion.choices[0].message.content.strip()
+        # Build conversation for Gemini
+        # System instruction goes into the model, history as chat
+        chat = gemini_model.start_chat(history=[
+            {"role": "user" if m["role"] == "user" else "model",
+             "parts": [m["content"]]}
+            for m in messages[1:]   # skip system message — handled separately
+            if m.get("role") in ("user", "assistant")
+        ])
+        # Inject system prompt + crm context as first user turn context
+        full_prompt = messages[0]["content"] + "\n\nUser message: " + raw
+        response    = chat.send_message(full_prompt)
+        ai_response = response.text.strip()
     except Exception as e:
-        print(f"Groq API error: {e}")
+        print(f"Gemini API error: {e}")
         ai_response = (
             f"I'm having a brief connectivity issue. Here's a quick summary:\n\n"
             f"**{PRODUCT_NAME} by {COMPANY_NAME}**\n"
