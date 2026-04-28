@@ -15,13 +15,13 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
 # ─────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
-    generation_config=genai.GenerationConfig(
-        max_output_tokens=400,
-        temperature=0.4,
-    )
-)
+# Fallback models — tries each in order if quota exceeded
+GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+]
+GEMINI_CONFIG = genai.GenerationConfig(max_output_tokens=400, temperature=0.4)
 
 # ─────────────────────────────────────────────────────────────
 # COMPANY
@@ -445,22 +445,27 @@ async def chat(msg: UserMessage):  # language in msg
             messages.append({"role": turn["role"], "content": turn["content"]})
     messages.append({"role": "user", "content": raw})
 
-    # Call Gemini API
-    try:
-        # Build conversation for Gemini
-        # System instruction goes into the model, history as chat
-        chat = gemini_model.start_chat(history=[
-            {"role": "user" if m["role"] == "user" else "model",
-             "parts": [m["content"]]}
-            for m in messages[1:]   # skip system message — handled separately
-            if m.get("role") in ("user", "assistant")
-        ])
-        # Inject system prompt + crm context as first user turn context
-        full_prompt = messages[0]["content"] + "\n\nUser message: " + raw
-        response    = chat.send_message(full_prompt)
-        ai_response = response.text.strip()
-    except Exception as e:
-        print(f"Gemini API error: {e}")
+    # Call Gemini API with model fallback
+    ai_response = None
+    full_prompt = messages[0]["content"] + "\n\nUser message: " + raw
+    gemini_history = [
+        {"role": "user" if m["role"] == "user" else "model",
+         "parts": [m["content"]]}
+        for m in messages[1:]
+        if m.get("role") in ("user", "assistant")
+    ]
+    for model_name in GEMINI_MODELS:
+        try:
+            model = genai.GenerativeModel(model_name=model_name, generation_config=GEMINI_CONFIG)
+            chat  = model.start_chat(history=gemini_history)
+            resp  = chat.send_message(full_prompt)
+            ai_response = resp.text.strip()
+            print(f"Gemini OK: {model_name}")
+            break
+        except Exception as e:
+            print(f"Gemini {model_name} error: {e}")
+            continue
+    if not ai_response:
         ai_response = (
             f"I'm having a brief connectivity issue. Here's a quick summary:\n\n"
             f"**{PRODUCT_NAME} by {COMPANY_NAME}**\n"
