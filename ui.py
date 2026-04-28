@@ -17,9 +17,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 # Fallback models — tries each in order if quota exceeded
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
 ]
 GEMINI_CONFIG = genai.GenerationConfig(max_output_tokens=400, temperature=0.4)
 
