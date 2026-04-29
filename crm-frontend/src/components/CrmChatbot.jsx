@@ -467,7 +467,7 @@ export default function CrmChatbot() {
             ? <span className="text-red-500">{speechError}</span>
             : isListening
               ? <span className="text-red-500 font-medium">🔴 Listening — speak now</span>
-              : <span>Powered by Gemini AI · {COMPANY_NAME}</span>
+              : <span>⚠️ AI in beta · responses may not always be accurate · {COMPANY_NAME}</span>
           }
         </div>
       </form>
